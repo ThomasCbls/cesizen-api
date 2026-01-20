@@ -1,10 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
-import { Utilisateur } from '../entities/utilisateur.entity';
-import { UtilisateurRepository } from '../repositories/utilisateur.repository';
-import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto';
-import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto';
-import { UtilisateurResponseDto } from '../dtos/utilisateur-response.dto';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import * as bcrypt from 'bcrypt'
+import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto'
+import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto'
+import { UtilisateurResponseDto } from '../dtos/utilisateur-response.dto'
+import { Utilisateur } from '../entities/utilisateur.entity'
+import { UtilisateurRepository } from '../repositories/utilisateur.repository'
 
 @Injectable()
 export class UtilisateurService {
@@ -14,98 +14,112 @@ export class UtilisateurService {
     // Vérifier si l'email existe déjà
     const existingUtilisateur = await this.utilisateurRepository.findByEmail(
       createUtilisateurDto.email,
-    );
+    )
 
     if (existingUtilisateur) {
-      throw new BadRequestException('Cet email est déjà utilisé');
+      throw new BadRequestException('Cet email est déjà utilisé')
     }
 
     // Hasher le mot de passe
-    const hashedPassword = await bcrypt.hash(createUtilisateurDto.mot_de_passe, 10);
+    const hashedPassword = await bcrypt.hash(createUtilisateurDto.mot_de_passe, 10)
 
     // Créer le nouvel utilisateur
     const utilisateur = this.utilisateurRepository.create({
       ...createUtilisateurDto,
       mot_de_passe: hashedPassword,
       role: createUtilisateurDto.role || 'user',
-    });
+    })
 
-    const savedUtilisateur = await this.utilisateurRepository.save(utilisateur);
-    return this.mapToResponseDto(savedUtilisateur);
+    const savedUtilisateur = await this.utilisateurRepository.save(utilisateur)
+    return this.mapToResponseDto(savedUtilisateur)
   }
 
-  async findAll(): Promise<UtilisateurResponseDto[]> {
-    const utilisateurs = await this.utilisateurRepository.findAllActifs();
-    return utilisateurs.map((u) => this.mapToResponseDto(u));
-  }
+  // async findAll(): Promise<UtilisateurResponseDto[]> {
+  //   const utilisateurs = await this.utilisateurRepository.findAllActifs();
+  //   return utilisateurs.map((u) => this.mapToResponseDto(u));
+  // }
 
   async findById(id: string): Promise<UtilisateurResponseDto> {
-    const utilisateur = await this.utilisateurRepository.findById(id);
+    const utilisateur = await this.utilisateurRepository.findById(id)
 
     if (!utilisateur) {
-      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`);
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
     }
 
-    return this.mapToResponseDto(utilisateur);
+    return this.mapToResponseDto(utilisateur)
   }
 
-  async update(id: string, updateUtilisateurDto: UpdateUtilisateurDto): Promise<UtilisateurResponseDto> {
-    const utilisateur = await this.utilisateurRepository.findById(id);
+  async update(
+    id: string,
+    updateUtilisateurDto: UpdateUtilisateurDto,
+  ): Promise<UtilisateurResponseDto> {
+    const utilisateur = await this.utilisateurRepository.findById(id)
 
     if (!utilisateur) {
-      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`);
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
     }
 
     // Si l'email change, vérifier qu'il n'existe pas déjà
     if (updateUtilisateurDto.email && updateUtilisateurDto.email !== utilisateur.email) {
       const existingUtilisateur = await this.utilisateurRepository.findByEmail(
         updateUtilisateurDto.email,
-      );
+      )
 
       if (existingUtilisateur) {
-        throw new BadRequestException('Cet email est déjà utilisé');
+        throw new BadRequestException('Cet email est déjà utilisé')
       }
     }
 
     // Si le mot de passe est fourni, le hasher
     if (updateUtilisateurDto.mot_de_passe) {
-      updateUtilisateurDto.mot_de_passe = await bcrypt.hash(
-        updateUtilisateurDto.mot_de_passe,
-        10,
-      );
+      updateUtilisateurDto.mot_de_passe = await bcrypt.hash(updateUtilisateurDto.mot_de_passe, 10)
     }
 
-    Object.assign(utilisateur, updateUtilisateurDto);
-    const updatedUtilisateur = await this.utilisateurRepository.save(utilisateur);
+    Object.assign(utilisateur, updateUtilisateurDto)
+    const updatedUtilisateur = await this.utilisateurRepository.save(utilisateur)
 
-    return this.mapToResponseDto(updatedUtilisateur);
+    return this.mapToResponseDto(updatedUtilisateur)
   }
 
   async remove(id: string): Promise<void> {
-    const utilisateur = await this.utilisateurRepository.findById(id);
+    const utilisateur = await this.utilisateurRepository.findById(id)
 
     if (!utilisateur) {
-      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`);
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
     }
 
     // Soft delete : marquer comme inactif
-    utilisateur.est_actif = false;
-    await this.utilisateurRepository.save(utilisateur);
+    // utilisateur.est_actif = false;
+    await this.utilisateurRepository.save(utilisateur)
   }
 
   async validatePassword(password: string, hashedPassword: string): Promise<boolean> {
-    return bcrypt.compare(password, hashedPassword);
+    return await bcrypt.compare(password, hashedPassword)
+  }
+
+  async validatePasswordForUser(id: string, password: string): Promise<boolean> {
+    const utilisateur = await this.utilisateurRepository.findById(id)
+
+    if (!utilisateur) {
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
+    }
+
+    return await this.validatePassword(password, utilisateur.mot_de_passe)
   }
 
   async findByEmail(email: string): Promise<UtilisateurResponseDto | null> {
-    const utilisateur = await this.utilisateurRepository.findByEmail(email);
-    return utilisateur ? this.mapToResponseDto(utilisateur) : null;
+    const utilisateur = await this.utilisateurRepository.findByEmail(email)
+    return utilisateur ? this.mapToResponseDto(utilisateur) : null
+  }
+
+  async findByEmailWithPassword(email: string): Promise<Utilisateur | null> {
+    return await this.utilisateurRepository.findByEmail(email)
   }
 
   private mapToResponseDto(utilisateur: Utilisateur): UtilisateurResponseDto {
-    const dto = new UtilisateurResponseDto(utilisateur);
+    const dto = new UtilisateurResponseDto(utilisateur)
     // Ne pas renvoyer le mot de passe
-    delete (dto as any).mot_de_passe;
-    return dto;
+    delete (dto as any).mot_de_passe
+    return dto
   }
 }

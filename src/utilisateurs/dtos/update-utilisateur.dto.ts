@@ -1,32 +1,32 @@
-import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsBoolean } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsBoolean } from 'class-validator'
 
 export class UpdateUtilisateurDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  nom?: string;
+  nom?: string
 
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  prenom?: string;
+  prenom?: string
 
   @IsOptional()
   @IsEmail({}, { message: "L'email doit être valide" })
-  email?: string;
+  email?: string
 
   @IsOptional()
   @IsString()
   @MinLength(8, { message: 'Le mot de passe doit contenir au moins 8 caractères' })
   @MaxLength(255)
-  mot_de_passe?: string;
+  mot_de_passe?: string
 
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  role?: string;
+  role?: string
 
   @IsOptional()
   @IsBoolean()
-  est_actif?: boolean;
+  est_actif?: boolean
 }
