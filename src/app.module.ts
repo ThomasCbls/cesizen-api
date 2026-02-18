@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { AuthModule } from './auth/auth.module'
+import { QuestionnairesModule } from './questionnaires/questionnaires.module'
 import { Utilisateur } from './utilisateurs/entities/utilisateur.entity'
 import { UtilisateurModule } from './utilisateurs/utilisateurs.module'
 
@@ -26,6 +27,7 @@ import { UtilisateurModule } from './utilisateurs/utilisateurs.module'
     }),
     UtilisateurModule,
     AuthModule,
+    QuestionnairesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
