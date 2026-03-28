@@ -4,6 +4,8 @@ import { Repository } from 'typeorm'
 import { UtilisateurRepository } from '../../utilisateurs/repositories/utilisateur.repository'
 import { CreateQuestionnaireDto } from '../dtos/create-questionnaire.dto'
 import { UpdateQuestionnaireDto } from '../dtos/update-questionnaire.dto'
+import { Event } from '../entities/event.entity'
+import { Question } from '../entities/question.entity'
 import { Questionnaire } from '../entities/questionnaire.entity'
 
 @Injectable()
@@ -11,13 +13,17 @@ export class QuestionnaireService {
   constructor(
     @InjectRepository(Questionnaire)
     private readonly questionnaireRepository: Repository<Questionnaire>,
+    @InjectRepository(Event)
+    private readonly eventRepository: Repository<Event>,
+    @InjectRepository(Question)
+    private readonly questionRepository: Repository<Question>,
     private readonly utilisateurRepository: UtilisateurRepository,
   ) {}
 
   async getAllQuestionnaires(): Promise<Questionnaire[]> {
     try {
       return await this.questionnaireRepository.find({
-        relations: ['createur'],
+        relations: ['createur', 'events', 'questions'],
         order: { date_creation: 'DESC' },
       })
     } catch (error) {
@@ -32,7 +38,7 @@ export class QuestionnaireService {
 
     const questionnaire = await this.questionnaireRepository.findOne({
       where: { id_Questionnaire: id },
-      relations: ['createur'],
+      relations: ['createur', 'events', 'questions'],
     })
 
     if (!questionnaire) {
@@ -57,7 +63,7 @@ export class QuestionnaireService {
 
     return await this.questionnaireRepository.find({
       where: { createur_id },
-      relations: ['createur'],
+      relations: ['createur', 'events', 'questions'],
       order: { date_creation: 'DESC' },
     })
   }
@@ -78,10 +84,39 @@ export class QuestionnaireService {
     const questionnaire = this.questionnaireRepository.create({
       nom: createQuestionnaireDto.nom,
       description: createQuestionnaireDto.description,
+      type: createQuestionnaireDto.type || 'stress_diagnostic',
       createur_id: createQuestionnaireDto.createur_id,
+      events: [],
+      questions: [],
     })
 
-    return await this.questionnaireRepository.save(questionnaire)
+    const savedQuestionnaire = await this.questionnaireRepository.save(questionnaire)
+
+    // Create events if provided
+    if (createQuestionnaireDto.events && createQuestionnaireDto.events.length > 0) {
+      const events = createQuestionnaireDto.events.map((eventDto) =>
+        this.eventRepository.create({
+          event: eventDto.event,
+          points: eventDto.points,
+          questionnaire: savedQuestionnaire,
+        }),
+      )
+      savedQuestionnaire.events = await this.eventRepository.save(events)
+    }
+
+    // Create questions if provided
+    if (createQuestionnaireDto.questions && createQuestionnaireDto.questions.length > 0) {
+      const questions = createQuestionnaireDto.questions.map((questionDto) =>
+        this.questionRepository.create({
+          question: questionDto.question,
+          order: questionDto.order,
+          questionnaire: savedQuestionnaire,
+        }),
+      )
+      savedQuestionnaire.questions = await this.questionRepository.save(questions)
+    }
+
+    return savedQuestionnaire
   }
 
   async updateQuestionnaire(

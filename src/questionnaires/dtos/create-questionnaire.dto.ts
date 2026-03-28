@@ -1,4 +1,15 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Length } from 'class-validator'
+import { Type } from 'class-transformer'
+import {
+  IsArray,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Length,
+  ValidateNested,
+} from 'class-validator'
+import { CreateEventDto } from './create-event.dto'
+import { CreateQuestionDto } from './create-question.dto'
 
 export class CreateQuestionnaireDto {
   @IsString()
@@ -10,7 +21,23 @@ export class CreateQuestionnaireDto {
   @IsOptional()
   description?: string
 
+  @IsString()
+  @IsOptional()
+  type?: string
+
   @IsNumber()
   @IsNotEmpty({ message: "L'ID du créateur est obligatoire" })
   createur_id: number
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateEventDto)
+  @IsOptional()
+  events?: CreateEventDto[]
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateQuestionDto)
+  @IsOptional()
+  questions?: CreateQuestionDto[]
 }
