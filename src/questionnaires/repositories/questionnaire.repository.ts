@@ -26,7 +26,7 @@ export class QuestionnaireRepository extends Repository<Questionnaire> {
     })
   }
 
-  async findQuestionnairesByCreateur(createur_id: number): Promise<Questionnaire[]> {
+  async findQuestionnairesByCreateur(createur_id: string): Promise<Questionnaire[]> {
     return this.repository.find({
       where: { createur_id },
       relations: ['createur'],

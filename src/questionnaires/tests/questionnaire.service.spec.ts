@@ -1,20 +1,20 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
 import { UtilisateurRepository } from '../../utilisateurs/repositories/utilisateur.repository'
 import { CreateQuestionnaireDto } from '../dtos/create-questionnaire.dto'
 import { UpdateQuestionnaireDto } from '../dtos/update-questionnaire.dto'
+import { Event } from '../entities/event.entity'
+import { Question } from '../entities/question.entity'
 import { Questionnaire } from '../entities/questionnaire.entity'
+import { QuestionnaireType } from '../enums/questionnaire-type.enum'
 import { QuestionnaireService } from '../services/questionnaire.service'
 
 describe('QuestionnaireService', () => {
   let service: QuestionnaireService
-  let repository: Repository<Questionnaire>
-  let utilisateurRepository: UtilisateurRepository
 
   const mockUtilisateur = {
-    id: 1,
+    id_utilisateur: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
     email: 'test@example.com',
     nom: 'Test',
     prenom: 'User',
@@ -22,11 +22,20 @@ describe('QuestionnaireService', () => {
 
   const mockQuestionnaire: Questionnaire = {
     id_Questionnaire: 1,
-    libelle: 'Test Questionnaire',
+    nom: 'Test Questionnaire',
     description: 'Test Description',
+    type: QuestionnaireType.STRESS_DIAGNOSTIC,
     date_creation: new Date(),
-    createur_id: 1,
+    createur_id: mockUtilisateur.id_utilisateur,
     createur: mockUtilisateur,
+    events: [
+      { id_Event: 2, event: 'Souvent', points: 3, questionnaire: undefined as never },
+      { id_Event: 1, event: 'Jamais', points: 0, questionnaire: undefined as never },
+    ],
+    questions: [
+      { id_Question: 2, question: 'Question 2', order: 2, questionnaire: undefined as never },
+      { id_Question: 1, question: 'Question 1', order: 1, questionnaire: undefined as never },
+    ],
   }
 
   const mockRepository = {
@@ -38,8 +47,18 @@ describe('QuestionnaireService', () => {
     remove: jest.fn(),
   }
 
+  const mockEventRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
+  }
+
+  const mockQuestionRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
+  }
+
   const mockUtilisateurRepository = {
-    findOne: jest.fn(),
+    findById: jest.fn(),
   }
 
   beforeEach(async () => {
@@ -51,6 +70,14 @@ describe('QuestionnaireService', () => {
           useValue: mockRepository,
         },
         {
+          provide: getRepositoryToken(Event),
+          useValue: mockEventRepository,
+        },
+        {
+          provide: getRepositoryToken(Question),
+          useValue: mockQuestionRepository,
+        },
+        {
           provide: UtilisateurRepository,
           useValue: mockUtilisateurRepository,
         },
@@ -58,8 +85,7 @@ describe('QuestionnaireService', () => {
     }).compile()
 
     service = module.get<QuestionnaireService>(QuestionnaireService)
-    repository = module.get<Repository<Questionnaire>>(getRepositoryToken(Questionnaire))
-    utilisateurRepository = module.get<UtilisateurRepository>(UtilisateurRepository)
+    jest.clearAllMocks()
   })
 
   describe('getAllQuestionnaires', () => {
@@ -88,7 +114,7 @@ describe('QuestionnaireService', () => {
       expect(result).toEqual(mockQuestionnaire)
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { id_Questionnaire: 1 },
-        relations: ['createur'],
+        relations: ['createur', 'events', 'questions'],
       })
     })
 
@@ -105,32 +131,47 @@ describe('QuestionnaireService', () => {
 
   describe('getQuestionnairesByCreateur', () => {
     it('should return questionnaires by createur id', async () => {
-      mockUtilisateurRepository.findOne.mockResolvedValue(mockUtilisateur)
+      mockUtilisateurRepository.findById.mockResolvedValue(mockUtilisateur)
       mockRepository.find.mockResolvedValue([mockQuestionnaire])
 
-      const result = await service.getQuestionnairesByCreateur(1)
+      const result = await service.getQuestionnairesByCreateur(mockUtilisateur.id_utilisateur)
 
       expect(result).toEqual([mockQuestionnaire])
     })
 
     it('should throw NotFoundException when utilisateur not found', async () => {
-      mockUtilisateurRepository.findOne.mockResolvedValue(null)
+      mockUtilisateurRepository.findById.mockResolvedValue(null)
 
-      await expect(service.getQuestionnairesByCreateur(999)).rejects.toThrow(NotFoundException)
+      await expect(
+        service.getQuestionnairesByCreateur('d505fbc8-66c2-4b84-a36f-2c43da7df000'),
+      ).rejects.toThrow(NotFoundException)
     })
   })
 
   describe('createQuestionnaire', () => {
     it('should create and return a questionnaire', async () => {
       const createDto: CreateQuestionnaireDto = {
-        libelle: 'Test Questionnaire',
+        nom: 'Test Questionnaire',
         description: 'Test Description',
-        createur_id: 1,
+        type: QuestionnaireType.STRESS_DIAGNOSTIC,
+        createur_id: mockUtilisateur.id_utilisateur,
+        events: [
+          { event: 'Jamais', points: 0 },
+          { event: 'Souvent', points: 3 },
+        ],
+        questions: [
+          { question: 'Question 1', order: 1 },
+          { question: 'Question 2', order: 2 },
+        ],
       }
 
-      mockUtilisateurRepository.findOne.mockResolvedValue(mockUtilisateur)
-      mockRepository.create.mockReturnValue(mockQuestionnaire)
-      mockRepository.save.mockResolvedValue(mockQuestionnaire)
+      mockUtilisateurRepository.findById.mockResolvedValue(mockUtilisateur)
+      mockRepository.create.mockReturnValue({ ...mockQuestionnaire, events: [], questions: [] })
+      mockRepository.save.mockResolvedValue({ ...mockQuestionnaire, events: [], questions: [] })
+      mockEventRepository.create.mockImplementation((value) => value)
+      mockEventRepository.save.mockResolvedValue(mockQuestionnaire.events)
+      mockQuestionRepository.create.mockImplementation((value) => value)
+      mockQuestionRepository.save.mockResolvedValue(mockQuestionnaire.questions)
 
       const result = await service.createQuestionnaire(createDto)
 
@@ -138,14 +179,33 @@ describe('QuestionnaireService', () => {
       expect(mockRepository.save).toHaveBeenCalled()
     })
 
+    it('should reject a stress questionnaire without answer levels', async () => {
+      mockUtilisateurRepository.findById.mockResolvedValue(mockUtilisateur)
+
+      await expect(
+        service.createQuestionnaire({
+          nom: 'Test Questionnaire',
+          createur_id: mockUtilisateur.id_utilisateur,
+          events: [{ event: 'Jamais', points: 0 }],
+          questions: [{ question: 'Question 1', order: 1 }],
+        }),
+      ).rejects.toThrow(BadRequestException)
+    })
+
     it('should throw NotFoundException when utilisateur not found', async () => {
       const createDto: CreateQuestionnaireDto = {
-        libelle: 'Test Questionnaire',
+        nom: 'Test Questionnaire',
         description: 'Test Description',
-        createur_id: 999,
+        type: QuestionnaireType.STRESS_DIAGNOSTIC,
+        createur_id: 'd505fbc8-66c2-4b84-a36f-2c43da7df000',
+        events: [
+          { event: 'Jamais', points: 0 },
+          { event: 'Souvent', points: 3 },
+        ],
+        questions: [{ question: 'Question 1', order: 1 }],
       }
 
-      mockUtilisateurRepository.findOne.mockResolvedValue(null)
+      mockUtilisateurRepository.findById.mockResolvedValue(null)
 
       await expect(service.createQuestionnaire(createDto)).rejects.toThrow(NotFoundException)
     })
@@ -154,7 +214,7 @@ describe('QuestionnaireService', () => {
   describe('updateQuestionnaire', () => {
     it('should update and return a questionnaire', async () => {
       const updateDto: UpdateQuestionnaireDto = {
-        libelle: 'Updated Questionnaire',
+        nom: 'Updated Questionnaire',
       }
 
       mockRepository.findOne.mockResolvedValue(mockQuestionnaire)
@@ -165,6 +225,7 @@ describe('QuestionnaireService', () => {
 
       const result = await service.updateQuestionnaire(1, updateDto)
 
+      expect(result.nom).toBe('Updated Questionnaire')
       expect(mockRepository.save).toHaveBeenCalled()
     })
   })

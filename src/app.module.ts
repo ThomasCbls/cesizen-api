@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module'
 import { QuestionnairesModule } from './questionnaires/questionnaires.module'
 import { Utilisateur } from './utilisateurs/entities/utilisateur.entity'
 import { UtilisateurModule } from './utilisateurs/utilisateurs.module'
+import { StressDiagnosticModule } from './stress-diagnostic/stress-diagnostic.module'
 
 @Module({
   imports: [
@@ -22,12 +23,14 @@ import { UtilisateurModule } from './utilisateurs/utilisateurs.module'
       password: process.env.DATABASE_PASSWORD,
       database: process.env.DATABASE_NAME || 'cesizen_db',
       entities: [Utilisateur],
+      autoLoadEntities: true,
       synchronize: process.env.NODE_ENV === 'development',
       logging: process.env.NODE_ENV === 'development',
     }),
     UtilisateurModule,
     AuthModule,
     QuestionnairesModule,
+    StressDiagnosticModule,
   ],
   controllers: [AppController],
   providers: [AppService],

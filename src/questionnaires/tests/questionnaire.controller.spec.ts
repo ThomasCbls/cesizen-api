@@ -10,7 +10,7 @@ describe('QuestionnaireController', () => {
   let service: QuestionnaireService
 
   const mockUtilisateur = {
-    id_utilisateur: 1,
+    id_utilisateur: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
     email: 'test@example.com',
     nom: 'Test',
     prenom: 'User',
@@ -20,8 +20,12 @@ describe('QuestionnaireController', () => {
     id_Questionnaire: 1,
     nom: 'Test Questionnaire',
     description: 'Test Description',
+    type: 'stress_diagnostic',
     date_creation: new Date(),
-    createur_id: 1,
+    createur_id: mockUtilisateur.id_utilisateur,
+    createur: mockUtilisateur,
+    events: [],
+    questions: [],
   }
 
   const mockQuestionnaireService = {
@@ -66,9 +70,11 @@ describe('QuestionnaireController', () => {
 
   describe('getQuestionnairesByCreateur', () => {
     it('should return questionnaires by createur id', async () => {
-      const result = await controller.getQuestionnairesByCreateur(1)
+      const result = await controller.getQuestionnairesByCreateur(mockUtilisateur.id_utilisateur)
       expect(result).toEqual([mockQuestionnaire])
-      expect(service.getQuestionnairesByCreateur).toHaveBeenCalledWith(1)
+      expect(service.getQuestionnairesByCreateur).toHaveBeenCalledWith(
+        mockUtilisateur.id_utilisateur,
+      )
     })
   })
 
@@ -77,7 +83,12 @@ describe('QuestionnaireController', () => {
       const createDto: CreateQuestionnaireDto = {
         nom: 'Test Questionnaire',
         description: 'Test Description',
-        createur_id: 1,
+        createur_id: mockUtilisateur.id_utilisateur,
+        events: [
+          { event: 'Jamais', points: 0 },
+          { event: 'Souvent', points: 3 },
+        ],
+        questions: [{ question: 'Question 1', order: 1 }],
       }
 
       const result = await controller.createQuestionnaire(createDto)

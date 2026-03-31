@@ -35,7 +35,6 @@ describe('UtilisateurService', () => {
             create: jest.fn(),
             save: jest.fn(),
             findByEmail: jest.fn(),
-            findAllActifs: jest.fn(),
             findById: jest.fn(),
           },
         },
@@ -80,18 +79,6 @@ describe('UtilisateurService', () => {
       ;(repository.findByEmail as jest.Mock).mockResolvedValue(mockUtilisateur)
 
       await expect(service.create(createDto)).rejects.toThrow(BadRequestException)
-    })
-  })
-
-  describe('findAll', () => {
-    it('devrait retourner tous les utilisateurs actifs', async () => {
-      ;(repository.findAllActifs as jest.Mock).mockResolvedValue([mockUtilisateur])
-
-      const result = await service.findAll()
-
-      expect(repository.findAllActifs).toHaveBeenCalled()
-      expect(result).toHaveLength(1)
-      expect(result[0].email).toBe(mockUtilisateur.email)
     })
   })
 

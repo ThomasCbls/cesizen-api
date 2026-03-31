@@ -1,4 +1,5 @@
-import { IsNumber, IsOptional, IsString, Length } from 'class-validator'
+import { IsEnum, IsOptional, IsString, IsUUID, Length } from 'class-validator'
+import { QuestionnaireType } from '../enums/questionnaire-type.enum'
 
 export class UpdateQuestionnaireDto {
   @IsString()
@@ -10,7 +11,13 @@ export class UpdateQuestionnaireDto {
   @IsOptional()
   description?: string
 
-  @IsNumber()
+  @IsEnum(QuestionnaireType, {
+    message: 'Le type doit être stress_diagnostic',
+  })
   @IsOptional()
-  createur_id?: number
+  type?: QuestionnaireType
+
+  @IsUUID('4', { message: "L'ID du créateur doit être un UUID valide" })
+  @IsOptional()
+  createur_id?: string
 }

@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator'
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator'
 
 export class CreateQuestionDto {
   @IsString()
@@ -7,5 +7,6 @@ export class CreateQuestionDto {
 
   @IsNumber()
   @IsOptional()
+  @Min(1, { message: 'L’ordre doit être supérieur ou égal à 1' })
   order?: number
 }

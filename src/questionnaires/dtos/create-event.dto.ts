@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsNumber, IsString } from 'class-validator'
+import { IsNotEmpty, IsNumber, IsString, Min } from 'class-validator'
 
 export class CreateEventDto {
   @IsString()
@@ -7,5 +7,6 @@ export class CreateEventDto {
 
   @IsNumber()
   @IsNotEmpty({ message: 'Les points sont obligatoires' })
+  @Min(0, { message: 'Les points doivent être supérieurs ou égaux à 0' })
   points: number
 }

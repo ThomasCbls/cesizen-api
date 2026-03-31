@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm'
 import { Utilisateur } from '../../utilisateurs/entities/utilisateur.entity'
+import { QuestionnaireType } from '../enums/questionnaire-type.enum'
 import { Event } from './event.entity'
 import { Question } from './question.entity'
 
@@ -23,20 +24,20 @@ export class Questionnaire {
   description: string
 
   @Column({ type: 'varchar', length: 50, default: 'stress_diagnostic' })
-  type: string
+  type: QuestionnaireType
 
   @CreateDateColumn()
   date_creation: Date
 
-  @ManyToOne(() => Utilisateur, (utilisateur) => utilisateur.id_utilisateur, {
+  @ManyToOne(() => Utilisateur, {
     eager: true,
     onDelete: 'CASCADE',
   })
   @JoinColumn({ name: 'createur_id' })
   createur: Utilisateur
 
-  @Column({ type: 'integer', nullable: false })
-  createur_id: number
+  @Column({ type: 'uuid', nullable: false })
+  createur_id: string
 
   @OneToMany(() => Event, (event) => event.questionnaire, {
     cascade: true,

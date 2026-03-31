@@ -9,7 +9,11 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common'
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../../auth/guards/roles.guard'
+import { Roles } from '../../auth/decorators/roles.decorator'
 import { CreateQuestionnaireDto } from '../dtos/create-questionnaire.dto'
 import { UpdateQuestionnaireDto } from '../dtos/update-questionnaire.dto'
 import { Questionnaire } from '../entities/questionnaire.entity'
@@ -30,14 +34,18 @@ export class QuestionnaireController {
   }
 
   @Get('createur/:createur_id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async getQuestionnairesByCreateur(
-    @Param('createur_id', ParseIntPipe) createur_id: number,
+    @Param('createur_id') createur_id: string,
   ): Promise<Questionnaire[]> {
     return this.questionnaireService.getQuestionnairesByCreateur(createur_id)
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async createQuestionnaire(
     @Body() createQuestionnaireDto: CreateQuestionnaireDto,
   ): Promise<Questionnaire> {
@@ -45,6 +53,8 @@ export class QuestionnaireController {
   }
 
   @Put(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async updateQuestionnaire(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateQuestionnaireDto: UpdateQuestionnaireDto,
@@ -54,6 +64,8 @@ export class QuestionnaireController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
   async deleteQuestionnaire(@Param('id', ParseIntPipe) id: number): Promise<void> {
     return this.questionnaireService.deleteQuestionnaire(id)
   }
