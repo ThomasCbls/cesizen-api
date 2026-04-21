@@ -6,48 +6,46 @@ import {
   ManyToOne,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm'
 import { Utilisateur } from '../../utilisateurs/entities/utilisateur.entity'
-import { QuestionnaireType } from '../enums/questionnaire-type.enum'
-import { Event } from './event.entity'
 import { Question } from './question.entity'
 
 @Entity('questionnaire')
 export class Questionnaire {
-  @PrimaryGeneratedColumn()
-  id_Questionnaire: number
+  @PrimaryGeneratedColumn('uuid')
+  id: string
 
   @Column({ type: 'varchar', length: 255 })
-  nom: string
+  title: string
 
   @Column({ type: 'text', nullable: true })
   description: string
 
-  @Column({ type: 'varchar', length: 50, default: 'stress_diagnostic' })
-  type: QuestionnaireType
+  @Column({ type: 'varchar', length: 50, default: 'STRESS' })
+  category: string
+
+  @Column({ type: 'boolean', default: true })
+  isActive: boolean
 
   @CreateDateColumn()
-  date_creation: Date
+  createdAt: Date
+
+  @UpdateDateColumn()
+  updatedAt: Date
 
   @ManyToOne(() => Utilisateur, {
-    eager: true,
-    onDelete: 'CASCADE',
+    nullable: true,
+    onDelete: 'SET NULL',
   })
   @JoinColumn({ name: 'createur_id' })
   createur: Utilisateur
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: 'uuid', nullable: true })
   createur_id: string
-
-  @OneToMany(() => Event, (event) => event.questionnaire, {
-    cascade: true,
-    eager: true,
-  })
-  events: Event[]
 
   @OneToMany(() => Question, (question) => question.questionnaire, {
     cascade: true,
-    eager: true,
   })
   questions: Question[]
 }

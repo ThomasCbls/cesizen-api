@@ -1,9 +1,9 @@
 import { UnauthorizedException } from '@nestjs/common'
-import { Test, TestingModule } from '@nestjs/testing'
-import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
-import { AuthService } from './auth.service'
+import { JwtService } from '@nestjs/jwt'
+import { Test, TestingModule } from '@nestjs/testing'
 import { UtilisateurService } from '../utilisateurs/services/utilisateur.service'
+import { AuthService } from './auth.service'
 
 describe('AuthService', () => {
   let service: AuthService
@@ -65,10 +65,7 @@ describe('AuthService', () => {
     })
 
     expect(result).toEqual({
-      success: true,
-      accessToken: 'jwt-token',
-      tokenType: 'Bearer',
-      expiresIn: '1h',
+      access_token: 'jwt-token',
       user: {
         id: mockUtilisateur.id_utilisateur,
         email: mockUtilisateur.email,

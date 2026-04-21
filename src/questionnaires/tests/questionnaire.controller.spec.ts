@@ -1,39 +1,54 @@
-import { Test, TestingModule } from '@nestjs/testing'
+﻿import { Test, TestingModule } from '@nestjs/testing'
 import { QuestionnaireController } from '../controllers/questionnaire.controller'
-import { CreateQuestionnaireDto } from '../dtos/create-questionnaire.dto'
-import { UpdateQuestionnaireDto } from '../dtos/update-questionnaire.dto'
-import { Questionnaire } from '../entities/questionnaire.entity'
 import { QuestionnaireService } from '../services/questionnaire.service'
 
 describe('QuestionnaireController', () => {
   let controller: QuestionnaireController
   let service: QuestionnaireService
 
-  const mockUtilisateur = {
-    id_utilisateur: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
-    email: 'test@example.com',
-    nom: 'Test',
-    prenom: 'User',
+  const mockQuestionnaireList = {
+    questionnaires: [
+      {
+        id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        title: 'Test Questionnaire',
+        description: 'Test Description',
+        category: 'STRESS',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ],
+    total: 1,
   }
 
-  const mockQuestionnaire: Questionnaire = {
-    id_Questionnaire: 1,
-    nom: 'Test Questionnaire',
-    description: 'Test Description',
-    type: 'stress_diagnostic',
-    date_creation: new Date(),
-    createur_id: mockUtilisateur.id_utilisateur,
-    createur: mockUtilisateur,
-    events: [],
-    questions: [],
+  const mockQuestionnaireDetail = {
+    questionnaire: {
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      title: 'Test Questionnaire',
+      description: 'Test Description',
+      category: 'STRESS',
+      isActive: true,
+      questions: [
+        {
+          id: 'q1-uuid',
+          text: 'Question 1',
+          order: 1,
+          options: [
+            { id: 'o1-uuid', text: 'Oui', score: 10 },
+            { id: 'o2-uuid', text: 'Non', score: 0 },
+          ],
+        },
+      ],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
   }
 
   const mockQuestionnaireService = {
-    getAllQuestionnaires: jest.fn().mockResolvedValue([mockQuestionnaire]),
-    getQuestionnaireById: jest.fn().mockResolvedValue(mockQuestionnaire),
-    getQuestionnairesByCreateur: jest.fn().mockResolvedValue([mockQuestionnaire]),
-    createQuestionnaire: jest.fn().mockResolvedValue(mockQuestionnaire),
-    updateQuestionnaire: jest.fn().mockResolvedValue(mockQuestionnaire),
+    getAllQuestionnaires: jest.fn().mockResolvedValue(mockQuestionnaireList),
+    getQuestionnaireById: jest.fn().mockResolvedValue(mockQuestionnaireDetail),
+    createQuestionnaire: jest.fn().mockResolvedValue(mockQuestionnaireDetail),
+    updateQuestionnaire: jest.fn().mockResolvedValue(mockQuestionnaireDetail),
     deleteQuestionnaire: jest.fn().mockResolvedValue(void 0),
   }
 
@@ -53,67 +68,69 @@ describe('QuestionnaireController', () => {
   })
 
   describe('getAllQuestionnaires', () => {
-    it('should return an array of questionnaires', async () => {
-      const result = await controller.getAllQuestionnaires()
-      expect(result).toEqual([mockQuestionnaire])
-      expect(service.getAllQuestionnaires).toHaveBeenCalled()
+    it('should return questionnaires with total', async () => {
+      const result = await controller.getAllQuestionnaires('STRESS', 10)
+      expect(result).toEqual(mockQuestionnaireList)
+      expect(service.getAllQuestionnaires).toHaveBeenCalledWith({
+        category: 'STRESS',
+        limit: 10,
+        page: undefined,
+        sortBy: undefined,
+        sortOrder: undefined,
+      })
     })
   })
 
   describe('getQuestionnaireById', () => {
     it('should return a questionnaire by id', async () => {
-      const result = await controller.getQuestionnaireById(1)
-      expect(result).toEqual(mockQuestionnaire)
-      expect(service.getQuestionnaireById).toHaveBeenCalledWith(1)
-    })
-  })
-
-  describe('getQuestionnairesByCreateur', () => {
-    it('should return questionnaires by createur id', async () => {
-      const result = await controller.getQuestionnairesByCreateur(mockUtilisateur.id_utilisateur)
-      expect(result).toEqual([mockQuestionnaire])
-      expect(service.getQuestionnairesByCreateur).toHaveBeenCalledWith(
-        mockUtilisateur.id_utilisateur,
-      )
+      const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      const result = await controller.getQuestionnaireById(id)
+      expect(result).toEqual(mockQuestionnaireDetail)
+      expect(service.getQuestionnaireById).toHaveBeenCalledWith(id)
     })
   })
 
   describe('createQuestionnaire', () => {
     it('should create and return a questionnaire', async () => {
-      const createDto: CreateQuestionnaireDto = {
-        nom: 'Test Questionnaire',
+      const createDto = {
+        title: 'Test Questionnaire',
         description: 'Test Description',
-        createur_id: mockUtilisateur.id_utilisateur,
-        events: [
-          { event: 'Jamais', points: 0 },
-          { event: 'Souvent', points: 3 },
+        category: 'STRESS',
+        questions: [
+          {
+            text: 'Question 1',
+            order: 1,
+            options: [
+              { text: 'Oui', score: 10 },
+              { text: 'Non', score: 0 },
+            ],
+          },
         ],
-        questions: [{ question: 'Question 1', order: 1 }],
       }
 
       const result = await controller.createQuestionnaire(createDto)
-      expect(result).toEqual(mockQuestionnaire)
+      expect(result).toEqual(mockQuestionnaireDetail)
       expect(service.createQuestionnaire).toHaveBeenCalledWith(createDto)
     })
   })
 
   describe('updateQuestionnaire', () => {
     it('should update and return a questionnaire', async () => {
-      const updateDto: UpdateQuestionnaireDto = {
-        nom: 'Updated Questionnaire',
-      }
+      const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      const updateDto = { title: 'Updated Questionnaire' }
 
-      const result = await controller.updateQuestionnaire(1, updateDto)
-      expect(result).toEqual(mockQuestionnaire)
-      expect(service.updateQuestionnaire).toHaveBeenCalledWith(1, updateDto)
+      const result = await controller.updateQuestionnaire(id, updateDto)
+      expect(result).toEqual(mockQuestionnaireDetail)
+      expect(service.updateQuestionnaire).toHaveBeenCalledWith(id, updateDto)
     })
   })
 
   describe('deleteQuestionnaire', () => {
     it('should delete a questionnaire', async () => {
-      const result = await controller.deleteQuestionnaire(1)
+      const id = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+      const result = await controller.deleteQuestionnaire(id)
       expect(result).toBeUndefined()
-      expect(service.deleteQuestionnaire).toHaveBeenCalledWith(1)
+      expect(service.deleteQuestionnaire).toHaveBeenCalledWith(id)
     })
   })
 })

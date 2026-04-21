@@ -1,23 +1,20 @@
-import { IsEnum, IsOptional, IsString, IsUUID, Length } from 'class-validator'
-import { QuestionnaireType } from '../enums/questionnaire-type.enum'
+import { IsBoolean, IsOptional, IsString, Length } from 'class-validator'
 
 export class UpdateQuestionnaireDto {
   @IsString()
   @IsOptional()
-  @Length(1, 255, { message: 'Le nom doit contenir entre 1 et 255 caractères' })
-  nom?: string
+  @Length(1, 255, { message: 'Le titre doit contenir entre 1 et 255 caractères' })
+  title?: string
 
   @IsString()
   @IsOptional()
   description?: string
 
-  @IsEnum(QuestionnaireType, {
-    message: 'Le type doit être stress_diagnostic',
-  })
+  @IsString()
   @IsOptional()
-  type?: QuestionnaireType
+  category?: string
 
-  @IsUUID('4', { message: "L'ID du créateur doit être un UUID valide" })
+  @IsBoolean()
   @IsOptional()
-  createur_id?: string
+  isActive?: boolean
 }

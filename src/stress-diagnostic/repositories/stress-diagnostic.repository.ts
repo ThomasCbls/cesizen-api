@@ -17,18 +17,26 @@ export class StressDiagnosticRepository {
     return this.repository.save(entity)
   }
 
-  async findById(id: number): Promise<StressDiagnosticResult | null> {
+  async findById(id: string): Promise<StressDiagnosticResult | null> {
     return this.repository.findOne({
-      where: { id_diagnostic: id },
-      relations: ['questionnaire', 'utilisateur', 'answers', 'answers.question', 'answers.event'],
+      where: { id },
+      relations: ['questionnaire', 'answers'],
     })
   }
 
-  async findByUtilisateurId(utilisateurId: string): Promise<StressDiagnosticResult[]> {
-    return this.repository.find({
+  async findByUtilisateurId(
+    utilisateurId: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{ diagnostics: StressDiagnosticResult[]; total: number }> {
+    const [diagnostics, total] = await this.repository.findAndCount({
       where: { utilisateur_id: utilisateurId },
-      relations: ['questionnaire', 'utilisateur', 'answers', 'answers.question', 'answers.event'],
-      order: { date_soumission: 'DESC' },
+      relations: ['questionnaire', 'answers'],
+      order: { submittedAt: 'DESC' },
+      take: limit,
+      skip: (page - 1) * limit,
     })
+
+    return { diagnostics, total }
   }
 }

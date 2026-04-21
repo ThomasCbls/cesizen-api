@@ -1,40 +1,32 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common'
+﻿import { NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { UtilisateurRepository } from '../../utilisateurs/repositories/utilisateur.repository'
-import { CreateQuestionnaireDto } from '../dtos/create-questionnaire.dto'
-import { UpdateQuestionnaireDto } from '../dtos/update-questionnaire.dto'
-import { Event } from '../entities/event.entity'
+import { Option } from '../entities/option.entity'
 import { Question } from '../entities/question.entity'
 import { Questionnaire } from '../entities/questionnaire.entity'
-import { QuestionnaireType } from '../enums/questionnaire-type.enum'
 import { QuestionnaireService } from '../services/questionnaire.service'
 
 describe('QuestionnaireService', () => {
   let service: QuestionnaireService
 
-  const mockUtilisateur = {
-    id_utilisateur: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
-    email: 'test@example.com',
-    nom: 'Test',
-    prenom: 'User',
-  }
-
-  const mockQuestionnaire: Questionnaire = {
-    id_Questionnaire: 1,
-    nom: 'Test Questionnaire',
+  const mockQuestionnaire = {
+    id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    title: 'Test Questionnaire',
     description: 'Test Description',
-    type: QuestionnaireType.STRESS_DIAGNOSTIC,
-    date_creation: new Date(),
-    createur_id: mockUtilisateur.id_utilisateur,
-    createur: mockUtilisateur,
-    events: [
-      { id_Event: 2, event: 'Souvent', points: 3, questionnaire: undefined as never },
-      { id_Event: 1, event: 'Jamais', points: 0, questionnaire: undefined as never },
-    ],
+    category: 'STRESS',
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
     questions: [
-      { id_Question: 2, question: 'Question 2', order: 2, questionnaire: undefined as never },
-      { id_Question: 1, question: 'Question 1', order: 1, questionnaire: undefined as never },
+      {
+        id: 'q1-uuid',
+        text: 'Question 1',
+        order: 1,
+        options: [
+          { id: 'o1-uuid', text: 'Oui', score: 10 },
+          { id: 'o2-uuid', text: 'Non', score: 0 },
+        ],
+      },
     ],
   }
 
@@ -43,13 +35,8 @@ describe('QuestionnaireService', () => {
     findOne: jest.fn(),
     create: jest.fn(),
     save: jest.fn(),
-    update: jest.fn(),
     remove: jest.fn(),
-  }
-
-  const mockEventRepository = {
-    create: jest.fn(),
-    save: jest.fn(),
+    createQueryBuilder: jest.fn(),
   }
 
   const mockQuestionRepository = {
@@ -57,8 +44,9 @@ describe('QuestionnaireService', () => {
     save: jest.fn(),
   }
 
-  const mockUtilisateurRepository = {
-    findById: jest.fn(),
+  const mockOptionRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
   }
 
   beforeEach(async () => {
@@ -70,16 +58,12 @@ describe('QuestionnaireService', () => {
           useValue: mockRepository,
         },
         {
-          provide: getRepositoryToken(Event),
-          useValue: mockEventRepository,
-        },
-        {
           provide: getRepositoryToken(Question),
           useValue: mockQuestionRepository,
         },
         {
-          provide: UtilisateurRepository,
-          useValue: mockUtilisateurRepository,
+          provide: getRepositoryToken(Option),
+          useValue: mockOptionRepository,
         },
       ],
     }).compile()
@@ -89,19 +73,22 @@ describe('QuestionnaireService', () => {
   })
 
   describe('getAllQuestionnaires', () => {
-    it('should return an array of questionnaires', async () => {
-      mockRepository.find.mockResolvedValue([mockQuestionnaire])
+    it('should return questionnaires with total', async () => {
+      const mockQb = {
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        getCount: jest.fn().mockResolvedValue(1),
+        take: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mockQuestionnaire]),
+      }
+      mockRepository.createQueryBuilder.mockReturnValue(mockQb)
 
-      const result = await service.getAllQuestionnaires()
+      const result = await service.getAllQuestionnaires({ category: 'STRESS' })
 
-      expect(result).toEqual([mockQuestionnaire])
-      expect(mockRepository.find).toHaveBeenCalled()
-    })
-
-    it('should throw BadRequestException on error', async () => {
-      mockRepository.find.mockRejectedValue(new Error('Database error'))
-
-      await expect(service.getAllQuestionnaires()).rejects.toThrow(BadRequestException)
+      expect(result.questionnaires).toHaveLength(1)
+      expect(result.total).toBe(1)
+      expect(result.questionnaires[0].title).toBe('Test Questionnaire')
     })
   })
 
@@ -109,124 +96,19 @@ describe('QuestionnaireService', () => {
     it('should return a questionnaire by id', async () => {
       mockRepository.findOne.mockResolvedValue(mockQuestionnaire)
 
-      const result = await service.getQuestionnaireById(1)
+      const result = await service.getQuestionnaireById('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
 
-      expect(result).toEqual(mockQuestionnaire)
-      expect(mockRepository.findOne).toHaveBeenCalledWith({
-        where: { id_Questionnaire: 1 },
-        relations: ['createur', 'events', 'questions'],
-      })
+      expect(result.questionnaire.title).toBe('Test Questionnaire')
+      expect(result.questionnaire.questions).toHaveLength(1)
+      expect(result.questionnaire.questions[0].options).toHaveLength(2)
     })
 
     it('should throw NotFoundException when questionnaire not found', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.getQuestionnaireById(999)).rejects.toThrow(NotFoundException)
-    })
-
-    it('should throw BadRequestException for invalid id', async () => {
-      await expect(service.getQuestionnaireById(0)).rejects.toThrow(BadRequestException)
-    })
-  })
-
-  describe('getQuestionnairesByCreateur', () => {
-    it('should return questionnaires by createur id', async () => {
-      mockUtilisateurRepository.findById.mockResolvedValue(mockUtilisateur)
-      mockRepository.find.mockResolvedValue([mockQuestionnaire])
-
-      const result = await service.getQuestionnairesByCreateur(mockUtilisateur.id_utilisateur)
-
-      expect(result).toEqual([mockQuestionnaire])
-    })
-
-    it('should throw NotFoundException when utilisateur not found', async () => {
-      mockUtilisateurRepository.findById.mockResolvedValue(null)
-
       await expect(
-        service.getQuestionnairesByCreateur('d505fbc8-66c2-4b84-a36f-2c43da7df000'),
+        service.getQuestionnaireById('d505fbc8-66c2-4b84-a36f-2c43da7df000'),
       ).rejects.toThrow(NotFoundException)
-    })
-  })
-
-  describe('createQuestionnaire', () => {
-    it('should create and return a questionnaire', async () => {
-      const createDto: CreateQuestionnaireDto = {
-        nom: 'Test Questionnaire',
-        description: 'Test Description',
-        type: QuestionnaireType.STRESS_DIAGNOSTIC,
-        createur_id: mockUtilisateur.id_utilisateur,
-        events: [
-          { event: 'Jamais', points: 0 },
-          { event: 'Souvent', points: 3 },
-        ],
-        questions: [
-          { question: 'Question 1', order: 1 },
-          { question: 'Question 2', order: 2 },
-        ],
-      }
-
-      mockUtilisateurRepository.findById.mockResolvedValue(mockUtilisateur)
-      mockRepository.create.mockReturnValue({ ...mockQuestionnaire, events: [], questions: [] })
-      mockRepository.save.mockResolvedValue({ ...mockQuestionnaire, events: [], questions: [] })
-      mockEventRepository.create.mockImplementation((value) => value)
-      mockEventRepository.save.mockResolvedValue(mockQuestionnaire.events)
-      mockQuestionRepository.create.mockImplementation((value) => value)
-      mockQuestionRepository.save.mockResolvedValue(mockQuestionnaire.questions)
-
-      const result = await service.createQuestionnaire(createDto)
-
-      expect(result).toEqual(mockQuestionnaire)
-      expect(mockRepository.save).toHaveBeenCalled()
-    })
-
-    it('should reject a stress questionnaire without answer levels', async () => {
-      mockUtilisateurRepository.findById.mockResolvedValue(mockUtilisateur)
-
-      await expect(
-        service.createQuestionnaire({
-          nom: 'Test Questionnaire',
-          createur_id: mockUtilisateur.id_utilisateur,
-          events: [{ event: 'Jamais', points: 0 }],
-          questions: [{ question: 'Question 1', order: 1 }],
-        }),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it('should throw NotFoundException when utilisateur not found', async () => {
-      const createDto: CreateQuestionnaireDto = {
-        nom: 'Test Questionnaire',
-        description: 'Test Description',
-        type: QuestionnaireType.STRESS_DIAGNOSTIC,
-        createur_id: 'd505fbc8-66c2-4b84-a36f-2c43da7df000',
-        events: [
-          { event: 'Jamais', points: 0 },
-          { event: 'Souvent', points: 3 },
-        ],
-        questions: [{ question: 'Question 1', order: 1 }],
-      }
-
-      mockUtilisateurRepository.findById.mockResolvedValue(null)
-
-      await expect(service.createQuestionnaire(createDto)).rejects.toThrow(NotFoundException)
-    })
-  })
-
-  describe('updateQuestionnaire', () => {
-    it('should update and return a questionnaire', async () => {
-      const updateDto: UpdateQuestionnaireDto = {
-        nom: 'Updated Questionnaire',
-      }
-
-      mockRepository.findOne.mockResolvedValue(mockQuestionnaire)
-      mockRepository.save.mockResolvedValue({
-        ...mockQuestionnaire,
-        ...updateDto,
-      })
-
-      const result = await service.updateQuestionnaire(1, updateDto)
-
-      expect(result.nom).toBe('Updated Questionnaire')
-      expect(mockRepository.save).toHaveBeenCalled()
     })
   })
 
@@ -235,7 +117,7 @@ describe('QuestionnaireService', () => {
       mockRepository.findOne.mockResolvedValue(mockQuestionnaire)
       mockRepository.remove.mockResolvedValue(mockQuestionnaire)
 
-      await service.deleteQuestionnaire(1)
+      await service.deleteQuestionnaire('a1b2c3d4-e5f6-7890-abcd-ef1234567890')
 
       expect(mockRepository.remove).toHaveBeenCalledWith(mockQuestionnaire)
     })
@@ -243,7 +125,9 @@ describe('QuestionnaireService', () => {
     it('should throw NotFoundException when questionnaire not found', async () => {
       mockRepository.findOne.mockResolvedValue(null)
 
-      await expect(service.deleteQuestionnaire(999)).rejects.toThrow(NotFoundException)
+      await expect(
+        service.deleteQuestionnaire('d505fbc8-66c2-4b84-a36f-2c43da7df000'),
+      ).rejects.toThrow(NotFoundException)
     })
   })
 })

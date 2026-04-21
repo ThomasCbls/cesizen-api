@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, MaxLength } from 'class-validator'
+import { IsEmail, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator'
 
 export class CreateUtilisateurDto {
   @IsNotEmpty({ message: 'Le nom est requis' })
@@ -21,6 +21,7 @@ export class CreateUtilisateurDto {
   @MaxLength(255)
   mot_de_passe: string
 
+  @IsOptional()
   @IsString()
   @MaxLength(50)
   role?: string

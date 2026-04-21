@@ -9,20 +9,19 @@ import {
 } from 'typeorm'
 import { Questionnaire } from '../../questionnaires/entities/questionnaire.entity'
 import { Utilisateur } from '../../utilisateurs/entities/utilisateur.entity'
-import { StressLevel } from '../enums/stress-level.enum'
 import { StressDiagnosticAnswer } from './stress-diagnostic-answer.entity'
 
 @Entity('stress_diagnostic_result')
 export class StressDiagnosticResult {
-  @PrimaryGeneratedColumn()
-  id_diagnostic: number
+  @PrimaryGeneratedColumn('uuid')
+  id: string
 
   @ManyToOne(() => Questionnaire, { eager: true, onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'questionnaire_id' })
   questionnaire: Questionnaire
 
-  @Column({ type: 'integer' })
-  questionnaire_id: number
+  @Column({ type: 'uuid' })
+  questionnaire_id: string
 
   @ManyToOne(() => Utilisateur, { eager: true, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'utilisateur_id' })
@@ -32,22 +31,25 @@ export class StressDiagnosticResult {
   utilisateur_id: string
 
   @Column({ type: 'integer' })
-  score_total: number
+  totalScore: number
 
   @Column({ type: 'integer' })
-  score_maximum: number
+  maxScore: number
 
-  @Column({
-    type: 'enum',
-    enum: StressLevel,
-  })
-  niveau_stress: StressLevel
+  @Column({ type: 'float' })
+  percentage: number
+
+  @Column({ type: 'varchar', length: 50 })
+  level: string
 
   @Column({ type: 'text' })
   interpretation: string
 
+  @Column({ type: 'simple-json', nullable: true })
+  recommendations: string[]
+
   @CreateDateColumn()
-  date_soumission: Date
+  submittedAt: Date
 
   @OneToMany(() => StressDiagnosticAnswer, (answer) => answer.diagnostic, {
     cascade: true,

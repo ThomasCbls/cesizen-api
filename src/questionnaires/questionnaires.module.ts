@@ -1,17 +1,17 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { UtilisateurModule } from '../utilisateurs/utilisateurs.module'
 import { QuestionnaireController } from './controllers/questionnaire.controller'
-import { Event } from './entities/event.entity'
+import { Option } from './entities/option.entity'
 import { Question } from './entities/question.entity'
 import { Questionnaire } from './entities/questionnaire.entity'
 import { QuestionnaireRepository } from './repositories/questionnaire.repository'
 import { QuestionnaireService } from './services/questionnaire.service'
+import { SeedService } from './services/seed.service'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Questionnaire, Event, Question]), UtilisateurModule],
+  imports: [TypeOrmModule.forFeature([Questionnaire, Question, Option])],
   controllers: [QuestionnaireController],
-  providers: [QuestionnaireService, QuestionnaireRepository],
+  providers: [QuestionnaireService, QuestionnaireRepository, SeedService],
   exports: [QuestionnaireService, QuestionnaireRepository],
 })
 export class QuestionnairesModule {}

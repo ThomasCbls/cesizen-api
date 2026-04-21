@@ -6,17 +6,17 @@ import {
   HttpCode,
   HttpStatus,
   Param,
-  ParseIntPipe,
+  ParseUUIDPipe,
   Post,
   Put,
+  Query,
   UseGuards,
 } from '@nestjs/common'
+import { Roles } from '../../auth/decorators/roles.decorator'
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../../auth/guards/roles.guard'
-import { Roles } from '../../auth/decorators/roles.decorator'
 import { CreateQuestionnaireDto } from '../dtos/create-questionnaire.dto'
 import { UpdateQuestionnaireDto } from '../dtos/update-questionnaire.dto'
-import { Questionnaire } from '../entities/questionnaire.entity'
 import { QuestionnaireService } from '../services/questionnaire.service'
 
 @Controller('questionnaires')
@@ -24,31 +24,32 @@ export class QuestionnaireController {
   constructor(private readonly questionnaireService: QuestionnaireService) {}
 
   @Get()
-  async getAllQuestionnaires(): Promise<Questionnaire[]> {
-    return this.questionnaireService.getAllQuestionnaires()
+  async getAllQuestionnaires(
+    @Query('category') category?: string,
+    @Query('limit') limit?: number,
+    @Query('page') page?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return this.questionnaireService.getAllQuestionnaires({
+      category,
+      limit,
+      page,
+      sortBy,
+      sortOrder,
+    })
   }
 
   @Get(':id')
-  async getQuestionnaireById(@Param('id', ParseIntPipe) id: number): Promise<Questionnaire> {
+  async getQuestionnaireById(@Param('id', ParseUUIDPipe) id: string) {
     return this.questionnaireService.getQuestionnaireById(id)
-  }
-
-  @Get('createur/:createur_id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin')
-  async getQuestionnairesByCreateur(
-    @Param('createur_id') createur_id: string,
-  ): Promise<Questionnaire[]> {
-    return this.questionnaireService.getQuestionnairesByCreateur(createur_id)
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  async createQuestionnaire(
-    @Body() createQuestionnaireDto: CreateQuestionnaireDto,
-  ): Promise<Questionnaire> {
+  async createQuestionnaire(@Body() createQuestionnaireDto: CreateQuestionnaireDto) {
     return this.questionnaireService.createQuestionnaire(createQuestionnaireDto)
   }
 
@@ -56,9 +57,9 @@ export class QuestionnaireController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
   async updateQuestionnaire(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() updateQuestionnaireDto: UpdateQuestionnaireDto,
-  ): Promise<Questionnaire> {
+  ) {
     return this.questionnaireService.updateQuestionnaire(id, updateQuestionnaireDto)
   }
 
@@ -66,7 +67,7 @@ export class QuestionnaireController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin')
-  async deleteQuestionnaire(@Param('id', ParseIntPipe) id: number): Promise<void> {
+  async deleteQuestionnaire(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
     return this.questionnaireService.deleteQuestionnaire(id)
   }
 }
