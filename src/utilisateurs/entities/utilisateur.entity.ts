@@ -21,12 +21,9 @@ export class Utilisateur {
   @Column({ type: 'varchar', length: 50, default: 'user' })
   role: string
 
+  @Column({ type: 'boolean', default: true })
+  est_actif: boolean
+
   @CreateDateColumn()
   date_inscription: Date
-
-  // @UpdateDateColumn()
-  // date_modification: Date;
-
-  // @Column({ type: 'boolean', default: true })
-  // est_actif: boolean;
 }

@@ -4,10 +4,9 @@ export class UtilisateurResponseDto {
   prenom: string
   email: string
   role: string
+  est_actif: boolean
   date_inscription: Date
   mot_de_passe?: string
-  // date_modification: Date;
-  // est_actif: boolean;
 
   constructor(partial: Partial<UtilisateurResponseDto>) {
     Object.assign(this, partial)

@@ -39,6 +39,64 @@ export class UtilisateurService {
   //   return utilisateurs.map((u) => this.mapToResponseDto(u));
   // }
 
+  // Méthodes d'administration (réservées aux admins)
+  async findAllForAdmin(): Promise<UtilisateurResponseDto[]> {
+    const utilisateurs = await this.utilisateurRepository.findAll()
+    return utilisateurs.map((u) => this.mapToResponseDto(u))
+  }
+
+  async deactivateUser(id: string): Promise<UtilisateurResponseDto> {
+    const utilisateur = await this.utilisateurRepository.findById(id)
+
+    if (!utilisateur) {
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
+    }
+
+    utilisateur.est_actif = false
+    const updatedUtilisateur = await this.utilisateurRepository.save(utilisateur)
+    return this.mapToResponseDto(updatedUtilisateur)
+  }
+
+  async activateUser(id: string): Promise<UtilisateurResponseDto> {
+    const utilisateur = await this.utilisateurRepository.findById(id)
+
+    if (!utilisateur) {
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
+    }
+
+    utilisateur.est_actif = true
+    const updatedUtilisateur = await this.utilisateurRepository.save(utilisateur)
+    return this.mapToResponseDto(updatedUtilisateur)
+  }
+
+  async changeUserRole(id: string, newRole: string): Promise<UtilisateurResponseDto> {
+    const utilisateur = await this.utilisateurRepository.findById(id)
+
+    if (!utilisateur) {
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
+    }
+
+    // Validation du rôle
+    const validRoles = ['user', 'admin']
+    if (!validRoles.includes(newRole)) {
+      throw new BadRequestException(`Rôle invalide. Rôles autorisés: ${validRoles.join(', ')}`)
+    }
+
+    utilisateur.role = newRole
+    const updatedUtilisateur = await this.utilisateurRepository.save(utilisateur)
+    return this.mapToResponseDto(updatedUtilisateur)
+  }
+
+  async hardDeleteUser(id: string): Promise<void> {
+    const utilisateur = await this.utilisateurRepository.findById(id)
+
+    if (!utilisateur) {
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
+    }
+
+    await this.utilisateurRepository.remove(utilisateur)
+  }
+
   async findById(id: string): Promise<UtilisateurResponseDto> {
     const utilisateur = await this.utilisateurRepository.findById(id)
 

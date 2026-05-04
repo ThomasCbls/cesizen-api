@@ -8,7 +8,11 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common'
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../../auth/guards/roles.guard'
+import { Roles } from '../../auth/decorators/roles.decorator'
 import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto'
 import { PasswordValidationResponseDto } from '../dtos/password-validation-response.dto'
 import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto'
@@ -66,5 +70,49 @@ export class UtilisateurController {
       validatePasswordDto.password,
     )
     return { isValid }
+  }
+
+  // Endpoints d'administration (réservés aux admins)
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  async findAllForAdmin(): Promise<UtilisateurResponseDto[]> {
+    return this.utilisateurService.findAllForAdmin()
+  }
+
+  @Patch('admin/:id/deactivate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  async deactivateUser(@Param('id') id: string): Promise<UtilisateurResponseDto> {
+    return this.utilisateurService.deactivateUser(id)
+  }
+
+  @Patch('admin/:id/activate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  async activateUser(@Param('id') id: string): Promise<UtilisateurResponseDto> {
+    return this.utilisateurService.activateUser(id)
+  }
+
+  @Patch('admin/:id/role')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.OK)
+  async changeUserRole(
+    @Param('id') id: string,
+    @Body('role') role: string,
+  ): Promise<UtilisateurResponseDto> {
+    return this.utilisateurService.changeUserRole(id, role)
+  }
+
+  @Delete('admin/:id/hard-delete')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async hardDeleteUser(@Param('id') id: string): Promise<void> {
+    return this.utilisateurService.hardDeleteUser(id)
   }
 }

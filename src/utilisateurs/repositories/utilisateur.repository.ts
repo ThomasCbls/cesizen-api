@@ -14,19 +14,25 @@ export class UtilisateurRepository extends Repository<Utilisateur> {
     })
   }
 
-  // async findAllActifs(): Promise<Utilisateur[]> {
-  //   return this.find({
-  //     // where: { est_actif: true },
-  //     order: { date_inscription: 'DESC' },
-  //   });
-  // }
+  async findAll(): Promise<Utilisateur[]> {
+    return this.find({
+      order: { date_inscription: 'DESC' },
+    })
+  }
 
-  // async findByRole(role: string): Promise<Utilisateur[]> {
-  //   return this.find({
-  //     where: { role, est_actif: true },
-  //     order: { date_inscription: 'DESC' },
-  //   });
-  // }
+  async findAllActifs(): Promise<Utilisateur[]> {
+    return this.find({
+      where: { est_actif: true },
+      order: { date_inscription: 'DESC' },
+    })
+  }
+
+  async findByRole(role: string): Promise<Utilisateur[]> {
+    return this.find({
+      where: { role, est_actif: true },
+      order: { date_inscription: 'DESC' },
+    })
+  }
 
   async findById(id: string): Promise<Utilisateur | null> {
     return this.findOne({

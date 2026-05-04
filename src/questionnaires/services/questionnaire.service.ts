@@ -196,4 +196,130 @@ export class QuestionnaireService {
 
     return questionnaire
   }
+
+  // ========== MÉTHODES D'ADMINISTRATION ==========
+
+  async addQuestionToQuestionnaire(
+    questionnaireId: number,
+    questionText: string,
+    order?: number,
+  ): Promise<Question> {
+    const questionnaire = await this.getQuestionnaireById(questionnaireId)
+
+    const question = this.questionRepository.create({
+      question: questionText,
+      order: order || (questionnaire.questions?.length || 0) + 1,
+      questionnaire: questionnaire,
+    })
+
+    return await this.questionRepository.save(question)
+  }
+
+  async updateQuestion(
+    questionId: number,
+    questionText?: string,
+    order?: number,
+  ): Promise<Question> {
+    const question = await this.questionRepository.findOne({
+      where: { id_Question: questionId },
+      relations: ['questionnaire'],
+    })
+
+    if (!question) {
+      throw new NotFoundException(`Question avec l'ID ${questionId} non trouvée`)
+    }
+
+    if (questionText !== undefined) {
+      question.question = questionText
+    }
+    if (order !== undefined) {
+      question.order = order
+    }
+
+    return await this.questionRepository.save(question)
+  }
+
+  async deleteQuestion(questionId: number): Promise<void> {
+    const question = await this.questionRepository.findOne({
+      where: { id_Question: questionId },
+    })
+
+    if (!question) {
+      throw new NotFoundException(`Question avec l'ID ${questionId} non trouvée`)
+    }
+
+    await this.questionRepository.remove(question)
+  }
+
+  async addEventToQuestionnaire(
+    questionnaireId: number,
+    eventText: string,
+    points: number,
+  ): Promise<Event> {
+    const questionnaire = await this.getQuestionnaireById(questionnaireId)
+
+    const event = this.eventRepository.create({
+      event: eventText,
+      points: points,
+      questionnaire: questionnaire,
+    })
+
+    return await this.eventRepository.save(event)
+  }
+
+  async updateEventScore(eventId: number, newPoints: number): Promise<Event> {
+    const event = await this.eventRepository.findOne({
+      where: { id_Event: eventId },
+      relations: ['questionnaire'],
+    })
+
+    if (!event) {
+      throw new NotFoundException(`Événement avec l'ID ${eventId} non trouvé`)
+    }
+
+    event.points = newPoints
+    return await this.eventRepository.save(event)
+  }
+
+  async updateEvent(eventId: number, eventText?: string, points?: number): Promise<Event> {
+    const event = await this.eventRepository.findOne({
+      where: { id_Event: eventId },
+      relations: ['questionnaire'],
+    })
+
+    if (!event) {
+      throw new NotFoundException(`Événement avec l'ID ${eventId} non trouvé`)
+    }
+
+    if (eventText !== undefined) {
+      event.event = eventText
+    }
+    if (points !== undefined) {
+      event.points = points
+    }
+
+    return await this.eventRepository.save(event)
+  }
+
+  async deleteEvent(eventId: number): Promise<void> {
+    const event = await this.eventRepository.findOne({
+      where: { id_Event: eventId },
+    })
+
+    if (!event) {
+      throw new NotFoundException(`Événement avec l'ID ${eventId} non trouvé`)
+    }
+
+    await this.eventRepository.remove(event)
+  }
+
+  async getQuestionsByQuestionnaire(questionnaireId: number): Promise<Question[]> {
+    const questionnaire = await this.getQuestionnaireById(questionnaireId)
+    return questionnaire.questions || []
+  }
+
+  async getEventsByQuestionnaire(questionnaireId: number): Promise<Event[]> {
+    const questionnaire = await this.getQuestionnaireById(questionnaireId)
+    return questionnaire.events || []
+  }
 }

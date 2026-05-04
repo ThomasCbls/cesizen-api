@@ -8,6 +8,8 @@ import { QuestionnairesModule } from './questionnaires/questionnaires.module'
 import { Utilisateur } from './utilisateurs/entities/utilisateur.entity'
 import { UtilisateurModule } from './utilisateurs/utilisateurs.module'
 import { StressDiagnosticModule } from './stress-diagnostic/stress-diagnostic.module'
+import { InformationsModule } from './informations/informations.module'
+import { AdminModule } from './admin/admin.module'
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { StressDiagnosticModule } from './stress-diagnostic/stress-diagnostic.mo
     AuthModule,
     QuestionnairesModule,
     StressDiagnosticModule,
+    InformationsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
