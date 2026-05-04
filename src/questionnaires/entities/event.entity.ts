@@ -1,6 +1,8 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm'
-import { Questionnaire } from './questionnaire.entity'
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 
+/**
+ * @deprecated This entity is no longer used. Replaced by Option entity.
+ */
 @Entity('event')
 export class Event {
   @PrimaryGeneratedColumn()
@@ -11,9 +13,4 @@ export class Event {
 
   @Column({ type: 'integer' })
   points: number
-
-  @ManyToOne(() => Questionnaire, (questionnaire) => questionnaire.events, {
-    onDelete: 'CASCADE',
-  })
-  questionnaire: Questionnaire
 }

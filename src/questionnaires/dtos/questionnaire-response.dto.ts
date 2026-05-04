@@ -1,24 +1,23 @@
-import { UtilisateurResponseDto } from '../../utilisateurs/dtos/utilisateur-response.dto'
-
-export class EventResponseDto {
-  id_Event: number
-  event: string
-  points: number
+export class OptionResponseDto {
+  id: string
+  text: string
+  score: number
 }
 
 export class QuestionResponseDto {
-  id_Question: number
-  question: string
+  id: string
+  text: string
   order?: number
+  options: OptionResponseDto[]
 }
 
 export class QuestionnaireResponseDto {
-  id_Questionnaire: number
-  nom: string
+  id: string
+  title: string
   description?: string
-  type: string
-  date_creation: Date
-  createur: UtilisateurResponseDto
-  events: EventResponseDto[]
-  questions: QuestionResponseDto[]
+  category: string
+  isActive: boolean
+  questions?: QuestionResponseDto[]
+  createdAt: Date
+  updatedAt: Date
 }

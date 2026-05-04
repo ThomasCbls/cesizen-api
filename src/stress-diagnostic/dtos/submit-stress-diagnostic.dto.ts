@@ -1,14 +1,25 @@
 import { Type } from 'class-transformer'
-import { ArrayNotEmpty, IsArray, IsInt, Min, ValidateNested } from 'class-validator'
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Min,
+  ValidateNested,
+} from 'class-validator'
 
 export class SubmitStressDiagnosticAnswerDto {
-  @IsInt({ message: "L'ID de question doit être un entier" })
-  @Min(1, { message: "L'ID de question doit être supérieur à 0" })
-  question_id: number
+  @IsUUID('4', { message: "L'ID de question doit être un UUID valide" })
+  questionId: string
 
-  @IsInt({ message: "L'ID d'événement doit être un entier" })
-  @Min(1, { message: "L'ID d'événement doit être supérieur à 0" })
-  event_id: number
+  @IsUUID('4', { message: "L'ID d'option doit être un UUID valide" })
+  optionId: string
+
+  @IsInt({ message: 'Le score doit être un entier' })
+  @Min(0, { message: 'Le score doit être supérieur ou égal à 0' })
+  @IsOptional()
+  score?: number
 }
 
 export class SubmitStressDiagnosticDto {

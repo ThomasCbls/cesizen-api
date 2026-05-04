@@ -14,23 +14,23 @@ export class QuestionnaireRepository extends Repository<Questionnaire> {
 
   async findAllQuestionnaires(): Promise<Questionnaire[]> {
     return this.repository.find({
-      relations: ['createur'],
-      order: { date_creation: 'DESC' },
+      relations: ['questions', 'questions.options'],
+      order: { createdAt: 'DESC' },
     })
   }
 
-  async findQuestionnaireById(id: number): Promise<Questionnaire | null> {
+  async findQuestionnaireById(id: string): Promise<Questionnaire | null> {
     return this.repository.findOne({
-      where: { id_Questionnaire: id },
-      relations: ['createur'],
+      where: { id },
+      relations: ['questions', 'questions.options'],
     })
   }
 
   async findQuestionnairesByCreateur(createur_id: string): Promise<Questionnaire[]> {
     return this.repository.find({
       where: { createur_id },
-      relations: ['createur'],
-      order: { date_creation: 'DESC' },
+      relations: ['questions', 'questions.options'],
+      order: { createdAt: 'DESC' },
     })
   }
 
@@ -40,14 +40,14 @@ export class QuestionnaireRepository extends Repository<Questionnaire> {
   }
 
   async updateQuestionnaire(
-    id: number,
+    id: string,
     questionnaire: Partial<Questionnaire>,
   ): Promise<Questionnaire | null> {
     await this.repository.update(id, questionnaire)
     return this.findQuestionnaireById(id)
   }
 
-  async deleteQuestionnaire(id: number): Promise<boolean> {
+  async deleteQuestionnaire(id: string): Promise<boolean> {
     const result = await this.repository.delete(id)
     return (result?.affected ?? 0) > 0
   }

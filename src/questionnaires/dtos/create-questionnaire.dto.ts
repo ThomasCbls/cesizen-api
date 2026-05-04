@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer'
 import {
   IsArray,
-  IsEnum,
+  IsBoolean,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -9,35 +9,29 @@ import {
   Length,
   ValidateNested,
 } from 'class-validator'
-import { CreateEventDto } from './create-event.dto'
 import { CreateQuestionDto } from './create-question.dto'
-import { QuestionnaireType } from '../enums/questionnaire-type.enum'
 
 export class CreateQuestionnaireDto {
   @IsString()
-  @IsNotEmpty({ message: 'Le nom est obligatoire' })
-  @Length(1, 255, { message: 'Le nom doit contenir entre 1 et 255 caractères' })
-  nom: string
+  @IsNotEmpty({ message: 'Le titre est obligatoire' })
+  @Length(1, 255, { message: 'Le titre doit contenir entre 1 et 255 caractères' })
+  title: string
 
   @IsString()
   @IsOptional()
   description?: string
 
-  @IsEnum(QuestionnaireType, {
-    message: 'Le type doit être stress_diagnostic',
-  })
+  @IsString()
   @IsOptional()
-  type?: QuestionnaireType
+  category?: string
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean
 
   @IsUUID('4', { message: "L'ID du créateur doit être un UUID valide" })
-  @IsNotEmpty({ message: "L'ID du créateur est obligatoire" })
-  createur_id: string
-
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateEventDto)
   @IsOptional()
-  events?: CreateEventDto[]
+  createur_id?: string
 
   @IsArray()
   @ValidateNested({ each: true })

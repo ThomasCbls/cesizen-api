@@ -1,163 +1,170 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { UtilisateurRepository } from '../../utilisateurs/repositories/utilisateur.repository'
 import { CreateQuestionnaireDto } from '../dtos/create-questionnaire.dto'
 import { UpdateQuestionnaireDto } from '../dtos/update-questionnaire.dto'
-import { QuestionnaireType } from '../enums/questionnaire-type.enum'
-import { Event } from '../entities/event.entity'
+import { Option } from '../entities/option.entity'
 import { Question } from '../entities/question.entity'
 import { Questionnaire } from '../entities/questionnaire.entity'
+
+interface QuestionnairesQueryParams {
+  category?: string
+  limit?: number
+  page?: number
+  sortBy?: string
+  sortOrder?: 'ASC' | 'DESC'
+}
 
 @Injectable()
 export class QuestionnaireService {
   constructor(
     @InjectRepository(Questionnaire)
     private readonly questionnaireRepository: Repository<Questionnaire>,
-    @InjectRepository(Event)
-    private readonly eventRepository: Repository<Event>,
     @InjectRepository(Question)
     private readonly questionRepository: Repository<Question>,
-    private readonly utilisateurRepository: UtilisateurRepository,
+    @InjectRepository(Option)
+    private readonly optionRepository: Repository<Option>,
   ) {}
 
-  async getAllQuestionnaires(): Promise<Questionnaire[]> {
-    try {
-      const questionnaires = await this.questionnaireRepository.find({
-        relations: ['createur', 'events', 'questions'],
-        order: { date_creation: 'DESC' },
-      })
+  async getAllQuestionnaires(params: QuestionnairesQueryParams) {
+    const { category, limit, page, sortBy, sortOrder } = params
+    const qb = this.questionnaireRepository.createQueryBuilder('q')
 
-      return questionnaires.map((questionnaire) => this.sortQuestionnaireRelations(questionnaire))
-    } catch {
-      throw new BadRequestException('Erreur lors de la récupération des questionnaires')
+    if (category) {
+      qb.andWhere('q.category = :category', { category })
+    }
+
+    qb.andWhere('q.isActive = :isActive', { isActive: true })
+
+    const orderField = sortBy || 'createdAt'
+    const orderDir = sortOrder || 'DESC'
+    qb.orderBy(`q.${orderField}`, orderDir)
+
+    const total = await qb.getCount()
+
+    if (limit) {
+      qb.take(limit)
+    }
+    if (page && limit) {
+      qb.skip((page - 1) * limit)
+    }
+
+    const questionnaires = await qb.getMany()
+
+    return {
+      questionnaires: questionnaires.map((q) => ({
+        id: q.id,
+        title: q.title,
+        description: q.description,
+        category: q.category,
+        isActive: q.isActive,
+        createdAt: q.createdAt,
+        updatedAt: q.updatedAt,
+      })),
+      total,
     }
   }
 
-  async getQuestionnaireById(id: number): Promise<Questionnaire> {
-    if (!id || id <= 0) {
-      throw new BadRequestException('ID invalide')
-    }
-
+  async getQuestionnaireById(id: string) {
     const questionnaire = await this.questionnaireRepository.findOne({
-      where: { id_Questionnaire: id },
-      relations: ['createur', 'events', 'questions'],
+      where: { id },
+      relations: ['questions', 'questions.options'],
     })
 
     if (!questionnaire) {
       throw new NotFoundException(`Questionnaire avec l'ID ${id} non trouvé`)
     }
 
-    return questionnaire
-  }
-
-  async getQuestionnairesByCreateur(createur_id: string): Promise<Questionnaire[]> {
-    if (!createur_id) {
-      throw new BadRequestException('ID créateur invalide')
-    }
-
-    const utilisateur = await this.utilisateurRepository.findById(createur_id)
-
-    if (!utilisateur) {
-      throw new NotFoundException(`Utilisateur avec l'ID ${createur_id} non trouvé`)
-    }
-
-    const questionnaires = await this.questionnaireRepository.find({
-      where: { createur_id },
-      relations: ['createur', 'events', 'questions'],
-      order: { date_creation: 'DESC' },
-    })
-
-    return questionnaires.map((questionnaire) => this.sortQuestionnaireRelations(questionnaire))
-  }
-
-  async createQuestionnaire(
-    createQuestionnaireDto: CreateQuestionnaireDto,
-  ): Promise<Questionnaire> {
-    const utilisateur = await this.utilisateurRepository.findById(
-      createQuestionnaireDto.createur_id,
+    const sortedQuestions = [...(questionnaire.questions || [])].sort(
+      (a, b) => (a.order || 0) - (b.order || 0),
     )
 
-    if (!utilisateur) {
-      throw new NotFoundException(
-        `Utilisateur avec l'ID ${createQuestionnaireDto.createur_id} non trouvé`,
-      )
+    return {
+      questionnaire: {
+        id: questionnaire.id,
+        title: questionnaire.title,
+        description: questionnaire.description,
+        category: questionnaire.category,
+        isActive: questionnaire.isActive,
+        questions: sortedQuestions.map((q) => ({
+          id: q.id,
+          text: q.text,
+          order: q.order,
+          options: (q.options || []).map((o) => ({
+            id: o.id,
+            text: o.text,
+            score: o.score,
+          })),
+        })),
+        createdAt: questionnaire.createdAt,
+        updatedAt: questionnaire.updatedAt,
+      },
     }
-
-    this.validateStressQuestionnaire(createQuestionnaireDto)
-
-    const questionnaire = this.questionnaireRepository.create({
-      nom: createQuestionnaireDto.nom,
-      description: createQuestionnaireDto.description,
-      type: createQuestionnaireDto.type || QuestionnaireType.STRESS_DIAGNOSTIC,
-      createur_id: createQuestionnaireDto.createur_id,
-      events: [],
-      questions: [],
-    })
-
-    const savedQuestionnaire = await this.questionnaireRepository.save(questionnaire)
-
-    // Create events if provided
-    if (createQuestionnaireDto.events && createQuestionnaireDto.events.length > 0) {
-      const events = createQuestionnaireDto.events.map((eventDto) =>
-        this.eventRepository.create({
-          event: eventDto.event,
-          points: eventDto.points,
-          questionnaire: savedQuestionnaire,
-        }),
-      )
-      savedQuestionnaire.events = await this.eventRepository.save(events)
-    }
-
-    // Create questions if provided
-    if (createQuestionnaireDto.questions && createQuestionnaireDto.questions.length > 0) {
-      const questions = createQuestionnaireDto.questions.map((questionDto) =>
-        this.questionRepository.create({
-          question: questionDto.question,
-          order: questionDto.order,
-          questionnaire: savedQuestionnaire,
-        }),
-      )
-      savedQuestionnaire.questions = await this.questionRepository.save(questions)
-    }
-
-    return this.sortQuestionnaireRelations(savedQuestionnaire)
   }
 
-  async updateQuestionnaire(
-    id: number,
-    updateQuestionnaireDto: UpdateQuestionnaireDto,
-  ): Promise<Questionnaire> {
-    const questionnaire = await this.getQuestionnaireById(id)
+  async createQuestionnaire(dto: CreateQuestionnaireDto) {
+    const questionnaire = this.questionnaireRepository.create({
+      title: dto.title,
+      description: dto.description,
+      category: dto.category || 'STRESS',
+      isActive: true,
+      createur_id: dto.createur_id,
+    })
 
-    if (updateQuestionnaireDto.createur_id) {
-      const utilisateur = await this.utilisateurRepository.findById(
-        updateQuestionnaireDto.createur_id,
-      )
+    const saved = await this.questionnaireRepository.save(questionnaire)
 
-      if (!utilisateur) {
-        throw new NotFoundException(
-          `Utilisateur avec l'ID ${updateQuestionnaireDto.createur_id} non trouvé`,
-        )
+    if (dto.questions && dto.questions.length > 0) {
+      for (const questionDto of dto.questions) {
+        const question = this.questionRepository.create({
+          text: questionDto.text,
+          order: questionDto.order,
+          questionnaire: saved,
+        })
+        const savedQuestion = await this.questionRepository.save(question)
+
+        if (questionDto.options && questionDto.options.length > 0) {
+          const options = questionDto.options.map((optDto) =>
+            this.optionRepository.create({
+              text: optDto.text,
+              score: optDto.score,
+              question: savedQuestion,
+            }),
+          )
+          await this.optionRepository.save(options)
+        }
       }
     }
 
-    this.validateStressQuestionnaire({
-      nom: updateQuestionnaireDto.nom ?? questionnaire.nom,
-      description: updateQuestionnaireDto.description ?? questionnaire.description,
-      type: updateQuestionnaireDto.type ?? (questionnaire.type as QuestionnaireType),
-      createur_id: updateQuestionnaireDto.createur_id ?? questionnaire.createur_id,
-      events: questionnaire.events,
-      questions: questionnaire.questions,
-    })
-
-    Object.assign(questionnaire, updateQuestionnaireDto)
-    const updatedQuestionnaire = await this.questionnaireRepository.save(questionnaire)
-    return this.sortQuestionnaireRelations(updatedQuestionnaire)
+    return this.getQuestionnaireById(saved.id)
   }
 
-  async deleteQuestionnaire(id: number): Promise<void> {
-    const questionnaire = await this.getQuestionnaireById(id)
+  async updateQuestionnaire(id: string, dto: UpdateQuestionnaireDto) {
+    const questionnaire = await this.questionnaireRepository.findOne({
+      where: { id },
+    })
+
+    if (!questionnaire) {
+      throw new NotFoundException(`Questionnaire avec l'ID ${id} non trouvé`)
+    }
+
+    if (dto.title !== undefined) questionnaire.title = dto.title
+    if (dto.description !== undefined) questionnaire.description = dto.description
+    if (dto.category !== undefined) questionnaire.category = dto.category
+    if (dto.isActive !== undefined) questionnaire.isActive = dto.isActive
+
+    await this.questionnaireRepository.save(questionnaire)
+    return this.getQuestionnaireById(id)
+  }
+
+  async deleteQuestionnaire(id: string): Promise<void> {
+    const questionnaire = await this.questionnaireRepository.findOne({
+      where: { id },
+    })
+
+    if (!questionnaire) {
+      throw new NotFoundException(`Questionnaire avec l'ID ${id} non trouvé`)
+    }
+
     await this.questionnaireRepository.remove(questionnaire)
   }
 

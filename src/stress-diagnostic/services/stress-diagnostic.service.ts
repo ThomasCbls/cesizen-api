@@ -1,4 +1,4 @@
-import {
+﻿import {
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -7,32 +7,19 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { AuthenticatedUser } from '../../auth/interfaces/authenticated-user.interface'
-import { QuestionnaireType } from '../../questionnaires/enums/questionnaire-type.enum'
-import { Event } from '../../questionnaires/entities/event.entity'
-import { Question } from '../../questionnaires/entities/question.entity'
 import { Questionnaire } from '../../questionnaires/entities/questionnaire.entity'
 import { StressDiagnosticHistoryQueryDto } from '../dtos/stress-diagnostic-history-query.dto'
+import {
+  StressDiagnosticHistoryItemDto,
+  StressDiagnosticHistoryResponseDto,
+  StressDiagnosticSubmitResponseDto,
+} from '../dtos/stress-diagnostic-response.dto'
 import {
   SubmitStressDiagnosticAnswerDto,
   SubmitStressDiagnosticDto,
 } from '../dtos/submit-stress-diagnostic.dto'
-import {
-  StressDiagnosticAnswerResponseDto,
-  StressDiagnosticResponseDto,
-} from '../dtos/stress-diagnostic-response.dto'
-import { StressLevel } from '../enums/stress-level.enum'
-import { StressDiagnosticRepository } from '../repositories/stress-diagnostic.repository'
 import { StressDiagnosticResult } from '../entities/stress-diagnostic-result.entity'
-
-type MappedStressAnswer = {
-  question: Question
-  question_id: number
-  event: Event
-  event_id: number
-  points_obtenus: number
-  question_label: string
-  event_label: string
-}
+import { StressDiagnosticRepository } from '../repositories/stress-diagnostic.repository'
 
 @Injectable()
 export class StressDiagnosticService {
@@ -43,58 +30,93 @@ export class StressDiagnosticService {
   ) {}
 
   async submitDiagnostic(
-    questionnaireId: number,
+    questionnaireId: string,
     submitDto: SubmitStressDiagnosticDto,
     currentUser: AuthenticatedUser,
-  ): Promise<StressDiagnosticResponseDto> {
+  ): Promise<StressDiagnosticSubmitResponseDto> {
     const questionnaire = await this.questionnaireRepository.findOne({
-      where: { id_Questionnaire: questionnaireId },
-      relations: ['createur', 'events', 'questions'],
+      where: { id: questionnaireId },
+      relations: ['questions', 'questions.options'],
     })
 
     if (!questionnaire) {
       throw new NotFoundException(`Questionnaire avec l'ID ${questionnaireId} non trouvé`)
     }
 
-    this.validateQuestionnaire(questionnaire)
-    const mappedAnswers = this.mapAndValidateAnswers(questionnaire, submitDto.answers)
-    const scoreTotal = mappedAnswers.reduce((total, answer) => total + answer.points_obtenus, 0)
-    const scoreMaximum =
-      questionnaire.questions.length * this.getMaximumEventPoints(questionnaire.events)
-    const interpretation = this.interpretScore(scoreTotal, scoreMaximum)
+    if (!questionnaire.isActive) {
+      throw new BadRequestException('Ce questionnaire est inactif')
+    }
+
+    if (!questionnaire.questions || questionnaire.questions.length === 0) {
+      throw new BadRequestException('Le questionnaire ne contient aucune question')
+    }
+
+    const { totalScore, maxScore, answerEntities } = this.processAnswers(
+      questionnaire,
+      submitDto.answers,
+    )
+    const percentage = maxScore > 0 ? Math.round((totalScore / maxScore) * 1000) / 10 : 0
+    const { level, interpretation, recommendations } = this.interpretHolmesRahe(totalScore)
 
     const diagnostic = await this.stressDiagnosticRepository.createAndSave({
       questionnaire,
-      questionnaire_id: questionnaire.id_Questionnaire,
+      questionnaire_id: questionnaireId,
       utilisateur_id: currentUser.sub,
-      score_total: scoreTotal,
-      score_maximum: scoreMaximum,
-      niveau_stress: interpretation.level,
-      interpretation: interpretation.message,
-      answers: mappedAnswers,
+      totalScore,
+      maxScore,
+      percentage,
+      level,
+      interpretation,
+      recommendations,
+      answers: answerEntities,
     })
 
-    return this.mapToResponse(diagnostic)
+    return {
+      success: true,
+      diagnosticId: diagnostic.id,
+      result: {
+        totalScore: diagnostic.totalScore,
+        maxScore: diagnostic.maxScore,
+        percentage: diagnostic.percentage,
+        level: diagnostic.level,
+        interpretation: diagnostic.interpretation,
+        recommendations: diagnostic.recommendations || [],
+      },
+      submittedAt: diagnostic.submittedAt,
+    }
   }
 
   async getHistory(
     currentUser: AuthenticatedUser,
     query: StressDiagnosticHistoryQueryDto,
-  ): Promise<StressDiagnosticResponseDto[]> {
+  ): Promise<StressDiagnosticHistoryResponseDto> {
     const targetUserId = query.utilisateurId || currentUser.sub
 
     if (targetUserId !== currentUser.sub && currentUser.role !== 'admin') {
       throw new ForbiddenException('Vous ne pouvez consulter que votre propre historique')
     }
 
-    const diagnostics = await this.stressDiagnosticRepository.findByUtilisateurId(targetUserId)
-    return diagnostics.map((diagnostic) => this.mapToResponse(diagnostic))
+    const page = query.page || 1
+    const limit = query.limit || 10
+
+    const { diagnostics, total } = await this.stressDiagnosticRepository.findByUtilisateurId(
+      targetUserId,
+      page,
+      limit,
+    )
+
+    return {
+      diagnostics: diagnostics.map((d) => this.mapToHistoryItem(d)),
+      total,
+      page,
+      limit,
+    }
   }
 
   async getDiagnosticById(
-    diagnosticId: number,
+    diagnosticId: string,
     currentUser: AuthenticatedUser,
-  ): Promise<StressDiagnosticResponseDto> {
+  ): Promise<StressDiagnosticHistoryItemDto> {
     const diagnostic = await this.stressDiagnosticRepository.findById(diagnosticId)
 
     if (!diagnostic) {
@@ -105,129 +127,120 @@ export class StressDiagnosticService {
       throw new ForbiddenException('Vous ne pouvez consulter que vos propres diagnostics')
     }
 
-    return this.mapToResponse(diagnostic)
+    return this.mapToHistoryItem(diagnostic)
   }
 
-  private validateQuestionnaire(questionnaire: Questionnaire): void {
-    if (questionnaire.type !== QuestionnaireType.STRESS_DIAGNOSTIC) {
-      throw new BadRequestException('Ce questionnaire ne correspond pas à un diagnostic de stress')
+  private processAnswers(questionnaire: Questionnaire, answers: SubmitStressDiagnosticAnswerDto[]) {
+    const questionMap = new Map(questionnaire.questions.map((q) => [q.id, q]))
+    let totalScore = 0
+    let maxScore = 0
+
+    for (const question of questionnaire.questions) {
+      const maxOptionScore = Math.max(...(question.options || []).map((o) => o.score), 0)
+      maxScore += maxOptionScore
     }
 
-    if (!questionnaire.questions || questionnaire.questions.length === 0) {
-      throw new BadRequestException('Le questionnaire ne contient aucune question')
-    }
+    const answerEntities: Array<{
+      question_id: string
+      option_id: string
+      score: number
+    }> = []
 
-    if (!questionnaire.events || questionnaire.events.length < 2) {
-      throw new BadRequestException('Le questionnaire ne contient pas assez de niveaux de réponse')
-    }
-  }
+    const answeredQuestionIds = new Set<string>()
 
-  private mapAndValidateAnswers(
-    questionnaire: Questionnaire,
-    answers: SubmitStressDiagnosticAnswerDto[],
-  ): MappedStressAnswer[] {
-    if (answers.length !== questionnaire.questions.length) {
-      throw new BadRequestException('Toutes les questions doivent recevoir exactement une réponse')
-    }
-
-    const answeredQuestionIds = new Set<number>()
-    const questionnaireQuestions = new Map<number, Question>(
-      questionnaire.questions.map((question) => [question.id_Question, question]),
-    )
-    const questionnaireEvents = new Map<number, Event>(
-      questionnaire.events.map((event) => [event.id_Event, event]),
-    )
-
-    return answers.map((answer) => {
-      if (answeredQuestionIds.has(answer.question_id)) {
-        throw new BadRequestException('Chaque question ne peut être répondue qu’une seule fois')
+    for (const answer of answers) {
+      if (answeredQuestionIds.has(answer.questionId)) {
+        throw new BadRequestException(`La question ${answer.questionId} a déjà été répondue`)
       }
 
-      const question = questionnaireQuestions.get(answer.question_id)
+      const question = questionMap.get(answer.questionId)
       if (!question) {
         throw new BadRequestException(
-          `La question ${answer.question_id} n'appartient pas au questionnaire`,
+          `La question ${answer.questionId} n'appartient pas au questionnaire`,
         )
       }
 
-      const event = questionnaireEvents.get(answer.event_id)
-      if (!event) {
+      const option = (question.options || []).find((o) => o.id === answer.optionId)
+      if (!option) {
         throw new BadRequestException(
-          `L'événement ${answer.event_id} n'appartient pas au questionnaire`,
+          `L'option ${answer.optionId} n'appartient pas à la question ${answer.questionId}`,
         )
       }
 
-      answeredQuestionIds.add(answer.question_id)
+      answeredQuestionIds.add(answer.questionId)
+      totalScore += option.score
 
-      return {
-        question,
-        question_id: question.id_Question,
-        event,
-        event_id: event.id_Event,
-        points_obtenus: event.points,
-        question_label: question.question,
-        event_label: event.event,
-      }
-    })
-  }
-
-  private getMaximumEventPoints(events: Event[]): number {
-    return events.reduce((max, event) => Math.max(max, event.points), 0)
-  }
-
-  private interpretScore(
-    scoreTotal: number,
-    scoreMaximum: number,
-  ): { level: StressLevel; message: string } {
-    if (scoreMaximum <= 0) {
-      throw new BadRequestException('Le score maximum du questionnaire doit être supérieur à 0')
+      answerEntities.push({
+        question_id: answer.questionId,
+        option_id: answer.optionId,
+        score: option.score,
+      })
     }
 
-    const percentage = (scoreTotal / scoreMaximum) * 100
+    return { totalScore, maxScore, answerEntities }
+  }
 
-    if (percentage <= 33) {
+  private interpretHolmesRahe(totalScore: number): {
+    level: string
+    interpretation: string
+    recommendations: string[]
+  } {
+    if (totalScore < 150) {
       return {
-        level: StressLevel.LOW,
-        message: 'Niveau de stress faible. Les signaux actuels restent globalement maîtrisés.',
+        level: 'LOW',
+        interpretation:
+          'Votre niveau de stress est faible. Vous avez un risque modéré de développer des problèmes de santé liés au stress.',
+        recommendations: [
+          'Continuez à maintenir un mode de vie équilibré',
+          'Pratiquez régulièrement des activités de détente',
+          'Maintenez vos liens sociaux et familiaux',
+        ],
       }
     }
 
-    if (percentage <= 66) {
+    if (totalScore < 300) {
       return {
-        level: StressLevel.MODERATE,
-        message:
-          'Niveau de stress modéré. Une vigilance et des actions préventives sont recommandées.',
+        level: 'MODERATE',
+        interpretation:
+          'Votre niveau de stress est modéré. Vous avez un risque accru (50%) de développer des problèmes de santé liés au stress.',
+        recommendations: [
+          'Accordez-vous des moments de repos et de récuperation',
+          'Pratiquez des exercices de respiration et de relaxation',
+          'Parlez de vos préoccupations a un proche ou un professionnel',
+          'Envisagez des techniques de gestion du stress comme la cohérence cardiaque',
+        ],
       }
     }
 
     return {
-      level: StressLevel.HIGH,
-      message:
-        'Niveau de stress élevé. Un accompagnement rapide ou des mesures correctives sont conseillés.',
+      level: 'HIGH',
+      interpretation:
+        'Votre niveau de stress est élevé. Vous avez un risque important (80%) de développer des problèmes de santé liés au stress.',
+      recommendations: [
+        'Consultez un professionnel de santé ou un psychologue',
+        'Mettez en place des exercices quotidiens de relaxation',
+        'Réduisez vos engagements si possible',
+        'Pratiquez la cohérence cardiaque plusieurs fois par jour',
+        'Maintenez une activité physique régulière',
+        "N'hésitez pas à demander de l'aide à votre entourage",
+      ],
     }
   }
 
-  private mapToResponse(diagnostic: StressDiagnosticResult): StressDiagnosticResponseDto {
+  private mapToHistoryItem(diagnostic: StressDiagnosticResult): StressDiagnosticHistoryItemDto {
     return {
-      id_diagnostic: diagnostic.id_diagnostic,
-      questionnaire_id: diagnostic.questionnaire_id,
-      questionnaire_nom: diagnostic.questionnaire.nom,
-      utilisateur_id: diagnostic.utilisateur_id,
-      score_total: diagnostic.score_total,
-      score_maximum: diagnostic.score_maximum,
-      niveau_stress: diagnostic.niveau_stress,
-      interpretation: diagnostic.interpretation,
-      date_soumission: diagnostic.date_soumission,
-      answers: (diagnostic.answers || []).map(
-        (answer): StressDiagnosticAnswerResponseDto => ({
-          id_reponse: answer.id_reponse,
-          question_id: answer.question_id,
-          question: answer.question_label,
-          event_id: answer.event_id,
-          event: answer.event_label,
-          points_obtenus: answer.points_obtenus,
-        }),
-      ),
+      id: diagnostic.id,
+      questionnaireId: diagnostic.questionnaire_id,
+      questionnaireTitle: diagnostic.questionnaire?.title || '',
+      result: {
+        totalScore: diagnostic.totalScore,
+        maxScore: diagnostic.maxScore,
+        percentage: diagnostic.percentage,
+        level: diagnostic.level,
+        interpretation: diagnostic.interpretation,
+        recommendations: diagnostic.recommendations || [],
+      },
+      submittedAt: diagnostic.submittedAt,
     }
   }
 }

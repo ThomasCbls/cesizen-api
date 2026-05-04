@@ -1,9 +1,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
-import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
+import { JwtService } from '@nestjs/jwt'
+import { UtilisateurService } from '../utilisateurs/services/utilisateur.service'
 import { LoginDto } from './dtos/login.dto'
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface'
-import { UtilisateurService } from '../utilisateurs/services/utilisateur.service'
 
 @Injectable()
 export class AuthService {
@@ -37,13 +37,10 @@ export class AuthService {
       prenom: utilisateur.prenom,
     }
 
-    const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '1h')
+    const accessToken = await this.jwtService.signAsync(payload)
 
     return {
-      success: true,
-      accessToken: await this.jwtService.signAsync(payload),
-      tokenType: 'Bearer',
-      expiresIn,
+      access_token: accessToken,
       user: {
         id: utilisateur.id_utilisateur,
         email: utilisateur.email,
@@ -51,6 +48,30 @@ export class AuthService {
         prenom: utilisateur.prenom,
         role: utilisateur.role,
       },
+    }
+  }
+
+  async getProfile(user: AuthenticatedUser) {
+    return {
+      id: user.sub,
+      email: user.email,
+      nom: user.nom,
+      prenom: user.prenom,
+      role: user.role,
+    }
+  }
+
+  async refresh(user: AuthenticatedUser) {
+    const payload: AuthenticatedUser = {
+      sub: user.sub,
+      email: user.email,
+      role: user.role,
+      nom: user.nom,
+      prenom: user.prenom,
+    }
+
+    return {
+      access_token: await this.jwtService.signAsync(payload),
     }
   }
 }

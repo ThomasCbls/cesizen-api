@@ -1,9 +1,7 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
+﻿import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
-import { QuestionnaireType } from '../../questionnaires/enums/questionnaire-type.enum'
 import { Questionnaire } from '../../questionnaires/entities/questionnaire.entity'
-import { StressLevel } from '../enums/stress-level.enum'
 import { StressDiagnosticRepository } from '../repositories/stress-diagnostic.repository'
 import { StressDiagnosticService } from '../services/stress-diagnostic.service'
 
@@ -24,27 +22,32 @@ describe('StressDiagnosticService', () => {
     role: 'admin',
   }
 
-  const questionnaire: Questionnaire = {
-    id_Questionnaire: 1,
-    nom: 'Diagnostic de stress CESIZen',
-    description: 'Questionnaire de référence',
-    type: QuestionnaireType.STRESS_DIAGNOSTIC,
-    date_creation: new Date(),
-    createur_id: adminUser.sub,
-    createur: undefined as never,
-    events: [
-      { id_Event: 1, event: 'Jamais', points: 0, questionnaire: undefined as never },
-      { id_Event: 2, event: 'Parfois', points: 2, questionnaire: undefined as never },
-      { id_Event: 3, event: 'Souvent', points: 4, questionnaire: undefined as never },
-    ],
+  const questionnaire = {
+    id: 'q-uuid-1',
+    title: 'Echelle de Holmes et Rahe',
+    description: 'Test questionnaire',
+    category: 'STRESS',
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
     questions: [
-      { id_Question: 1, question: 'Je me sens tendu', order: 1, questionnaire: undefined as never },
-      { id_Question: 2, question: 'Je dors mal', order: 2, questionnaire: undefined as never },
       {
-        id_Question: 3,
-        question: 'Je rumine mes tâches',
-        order: 3,
-        questionnaire: undefined as never,
+        id: 'q1-uuid',
+        text: 'Décès du conjoint',
+        order: 1,
+        options: [
+          { id: 'o1-uuid', text: 'Oui, dans les 12 derniers mois', score: 100 },
+          { id: 'o2-uuid', text: 'Non', score: 0 },
+        ],
+      },
+      {
+        id: 'q2-uuid',
+        text: 'Divorce',
+        order: 2,
+        options: [
+          { id: 'o3-uuid', text: 'Oui, dans les 12 derniers mois', score: 73 },
+          { id: 'o4-uuid', text: 'Non', score: 0 },
+        ],
       },
     ],
   }
@@ -81,59 +84,47 @@ describe('StressDiagnosticService', () => {
   it('creates a diagnostic result with score and interpretation', async () => {
     mockQuestionnaireRepository.findOne.mockResolvedValue(questionnaire)
     mockStressDiagnosticRepository.createAndSave.mockImplementation((payload) => ({
-      id_diagnostic: 10,
+      id: 'diag-uuid-1',
       questionnaire,
-      questionnaire_id: questionnaire.id_Questionnaire,
-      utilisateur: undefined,
+      questionnaire_id: questionnaire.id,
       utilisateur_id: currentUser.sub,
-      score_total: payload.score_total,
-      score_maximum: payload.score_maximum,
-      niveau_stress: payload.niveau_stress,
+      totalScore: payload.totalScore,
+      maxScore: payload.maxScore,
+      percentage: payload.percentage,
+      level: payload.level,
       interpretation: payload.interpretation,
-      date_soumission: new Date('2026-03-31T10:00:00.000Z'),
-      answers: payload.answers.map((answer, index) => ({
-        id_reponse: index + 1,
-        diagnostic: undefined,
-        diagnostic_id: 10,
-        question: answer.question,
-        question_id: answer.question_id,
-        event: answer.event,
-        event_id: answer.event_id,
-        points_obtenus: answer.points_obtenus,
-        question_label: answer.question_label,
-        event_label: answer.event_label,
-      })),
+      recommendations: payload.recommendations,
+      submittedAt: new Date('2026-03-31T10:00:00.000Z'),
+      answers: [],
     }))
 
     const result = await service.submitDiagnostic(
-      1,
+      'q-uuid-1',
       {
         answers: [
-          { question_id: 1, event_id: 2 },
-          { question_id: 2, event_id: 3 },
-          { question_id: 3, event_id: 3 },
+          { questionId: 'q1-uuid', optionId: 'o1-uuid', score: 100 },
+          { questionId: 'q2-uuid', optionId: 'o3-uuid', score: 73 },
         ],
       },
       currentUser,
     )
 
-    expect(result.score_total).toBe(10)
-    expect(result.score_maximum).toBe(12)
-    expect(result.niveau_stress).toBe(StressLevel.HIGH)
-    expect(result.answers).toHaveLength(3)
+    expect(result.success).toBe(true)
+    expect(result.result.totalScore).toBe(173)
+    expect(result.result.maxScore).toBe(173)
+    expect(result.result.level).toBe('MODERATE')
   })
 
-  it('rejects duplicate or incomplete answers', async () => {
+  it('rejects duplicate answers for the same question', async () => {
     mockQuestionnaireRepository.findOne.mockResolvedValue(questionnaire)
 
     await expect(
       service.submitDiagnostic(
-        1,
+        'q-uuid-1',
         {
           answers: [
-            { question_id: 1, event_id: 1 },
-            { question_id: 1, event_id: 2 },
-            { question_id: 3, event_id: 3 },
+            { questionId: 'q1-uuid', optionId: 'o1-uuid', score: 100 },
+            { questionId: 'q1-uuid', optionId: 'o2-uuid', score: 0 },
           ],
         },
         currentUser,
@@ -141,27 +132,33 @@ describe('StressDiagnosticService', () => {
     ).rejects.toThrow(BadRequestException)
   })
 
-  it('returns only the current user history unless admin asks for another user', async () => {
-    mockStressDiagnosticRepository.findByUtilisateurId.mockResolvedValue([
-      {
-        id_diagnostic: 10,
-        questionnaire,
-        questionnaire_id: questionnaire.id_Questionnaire,
-        utilisateur: undefined,
-        utilisateur_id: currentUser.sub,
-        score_total: 4,
-        score_maximum: 12,
-        niveau_stress: StressLevel.MODERATE,
-        interpretation: 'Moderate',
-        date_soumission: new Date('2026-03-31T10:00:00.000Z'),
-        answers: [],
-      },
-    ])
+  it('returns paginated history for the current user', async () => {
+    mockStressDiagnosticRepository.findByUtilisateurId.mockResolvedValue({
+      diagnostics: [
+        {
+          id: 'diag-uuid-1',
+          questionnaire,
+          questionnaire_id: questionnaire.id,
+          utilisateur_id: currentUser.sub,
+          totalScore: 100,
+          maxScore: 173,
+          percentage: 57.8,
+          level: 'LOW',
+          interpretation: 'Niveau faible',
+          recommendations: [],
+          submittedAt: new Date('2026-03-31T10:00:00.000Z'),
+          answers: [],
+        },
+      ],
+      total: 1,
+    })
 
     const result = await service.getHistory(currentUser, {})
 
-    expect(result).toHaveLength(1)
-    expect(mockStressDiagnosticRepository.findByUtilisateurId).toHaveBeenCalledWith(currentUser.sub)
+    expect(result.diagnostics).toHaveLength(1)
+    expect(result.total).toBe(1)
+    expect(result.page).toBe(1)
+    expect(result.limit).toBe(10)
   })
 
   it('forbids reading another user history without admin role', async () => {
@@ -174,27 +171,30 @@ describe('StressDiagnosticService', () => {
 
   it('returns a diagnostic detail for admins even if it belongs to another user', async () => {
     mockStressDiagnosticRepository.findById.mockResolvedValue({
-      id_diagnostic: 10,
+      id: 'diag-uuid-1',
       questionnaire,
-      questionnaire_id: questionnaire.id_Questionnaire,
-      utilisateur: undefined,
+      questionnaire_id: questionnaire.id,
       utilisateur_id: currentUser.sub,
-      score_total: 4,
-      score_maximum: 12,
-      niveau_stress: StressLevel.MODERATE,
-      interpretation: 'Moderate',
-      date_soumission: new Date('2026-03-31T10:00:00.000Z'),
+      totalScore: 100,
+      maxScore: 173,
+      percentage: 57.8,
+      level: 'LOW',
+      interpretation: 'Niveau faible',
+      recommendations: [],
+      submittedAt: new Date('2026-03-31T10:00:00.000Z'),
       answers: [],
     })
 
-    const result = await service.getDiagnosticById(10, adminUser)
+    const result = await service.getDiagnosticById('diag-uuid-1', adminUser)
 
-    expect(result.id_diagnostic).toBe(10)
+    expect(result.id).toBe('diag-uuid-1')
   })
 
   it('throws NotFoundException when the diagnostic does not exist', async () => {
     mockStressDiagnosticRepository.findById.mockResolvedValue(null)
 
-    await expect(service.getDiagnosticById(404, currentUser)).rejects.toThrow(NotFoundException)
+    await expect(
+      service.getDiagnosticById('d505fbc8-66c2-4b84-a36f-2c43da7df000', currentUser),
+    ).rejects.toThrow(NotFoundException)
   })
 })

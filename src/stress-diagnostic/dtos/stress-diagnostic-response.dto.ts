@@ -1,23 +1,30 @@
-import { StressLevel } from '../enums/stress-level.enum'
-
-export class StressDiagnosticAnswerResponseDto {
-  id_reponse: number
-  question_id: number
-  question: string
-  event_id: number
-  event: string
-  points_obtenus: number
+export class StressDiagnosticResultDto {
+  totalScore: number
+  maxScore: number
+  percentage: number
+  level: string
+  interpretation: string
+  recommendations: string[]
 }
 
-export class StressDiagnosticResponseDto {
-  id_diagnostic: number
-  questionnaire_id: number
-  questionnaire_nom: string
-  utilisateur_id: string
-  score_total: number
-  score_maximum: number
-  niveau_stress: StressLevel
-  interpretation: string
-  date_soumission: Date
-  answers: StressDiagnosticAnswerResponseDto[]
+export class StressDiagnosticSubmitResponseDto {
+  success: boolean
+  diagnosticId: string
+  result: StressDiagnosticResultDto
+  submittedAt: Date
+}
+
+export class StressDiagnosticHistoryItemDto {
+  id: string
+  questionnaireId: string
+  questionnaireTitle: string
+  result: StressDiagnosticResultDto
+  submittedAt: Date
+}
+
+export class StressDiagnosticHistoryResponseDto {
+  diagnostics: StressDiagnosticHistoryItemDto[]
+  total: number
+  page: number
+  limit: number
 }

@@ -1,7 +1,6 @@
-import { Test, TestingModule } from '@nestjs/testing'
+﻿import { Test, TestingModule } from '@nestjs/testing'
 import { StressDiagnosticController } from '../controllers/stress-diagnostic.controller'
 import { StressDiagnosticService } from '../services/stress-diagnostic.service'
-import { StressLevel } from '../enums/stress-level.enum'
 
 describe('StressDiagnosticController', () => {
   let controller: StressDiagnosticController
@@ -15,23 +14,39 @@ describe('StressDiagnosticController', () => {
     prenom: 'Tester',
   }
 
-  const diagnostic = {
-    id_diagnostic: 1,
-    questionnaire_id: 1,
-    questionnaire_nom: 'Diagnostic de stress CESIZen',
-    utilisateur_id: currentUser.sub,
-    score_total: 6,
-    score_maximum: 12,
-    niveau_stress: StressLevel.MODERATE,
-    interpretation: 'Niveau de stress modéré.',
-    date_soumission: new Date('2026-03-31T10:00:00.000Z'),
-    answers: [],
+  const submitResponse = {
+    success: true,
+    diagnosticId: 'diag-uuid-1',
+    result: {
+      totalScore: 173,
+      maxScore: 600,
+      percentage: 28.8,
+      level: 'MODERATE',
+      interpretation: 'Niveau de stress modere.',
+      recommendations: ['Pratiquez des exercices de respiration'],
+    },
+    submittedAt: new Date('2026-03-31T10:00:00.000Z'),
   }
 
-  const mockStressDiagnosticService = {
-    submitDiagnostic: jest.fn().mockResolvedValue(diagnostic),
-    getHistory: jest.fn().mockResolvedValue([diagnostic]),
-    getDiagnosticById: jest.fn().mockResolvedValue(diagnostic),
+  const historyResponse = {
+    diagnostics: [
+      {
+        id: 'diag-uuid-1',
+        questionnaireId: 'q-uuid-1',
+        questionnaireTitle: 'Echelle de Holmes et Rahe',
+        result: submitResponse.result,
+        submittedAt: new Date('2026-03-31T10:00:00.000Z'),
+      },
+    ],
+    total: 1,
+    page: 1,
+    limit: 10,
+  }
+
+  const mockService = {
+    submitDiagnostic: jest.fn().mockResolvedValue(submitResponse),
+    getHistory: jest.fn().mockResolvedValue(historyResponse),
+    getDiagnosticById: jest.fn().mockResolvedValue(historyResponse.diagnostics[0]),
   }
 
   beforeEach(async () => {
@@ -40,7 +55,7 @@ describe('StressDiagnosticController', () => {
       providers: [
         {
           provide: StressDiagnosticService,
-          useValue: mockStressDiagnosticService,
+          useValue: mockService,
         },
       ],
     }).compile()
@@ -48,39 +63,37 @@ describe('StressDiagnosticController', () => {
     controller = module.get<StressDiagnosticController>(StressDiagnosticController)
     service = module.get<StressDiagnosticService>(StressDiagnosticService)
     jest.clearAllMocks()
-    mockStressDiagnosticService.submitDiagnostic.mockResolvedValue(diagnostic)
-    mockStressDiagnosticService.getHistory.mockResolvedValue([diagnostic])
-    mockStressDiagnosticService.getDiagnosticById.mockResolvedValue(diagnostic)
+    mockService.submitDiagnostic.mockResolvedValue(submitResponse)
+    mockService.getHistory.mockResolvedValue(historyResponse)
+    mockService.getDiagnosticById.mockResolvedValue(historyResponse.diagnostics[0])
   })
 
   it('submits a diagnostic for the current user', async () => {
-    const result = await controller.submitDiagnostic(
-      1,
-      {
-        answers: [{ question_id: 1, event_id: 2 }],
-      },
-      currentUser,
-    )
+    const questionnaireId = 'q-uuid-1'
+    const body = {
+      answers: [
+        { questionId: 'q1-uuid', optionId: 'o1-uuid', score: 100 },
+      ],
+    }
 
-    expect(result).toEqual(diagnostic)
-    expect(service.submitDiagnostic).toHaveBeenCalledWith(
-      1,
-      { answers: [{ question_id: 1, event_id: 2 }] },
-      currentUser,
-    )
+    const result = await controller.submitDiagnostic(questionnaireId, body, currentUser)
+
+    expect(result).toEqual(submitResponse)
+    expect(service.submitDiagnostic).toHaveBeenCalledWith(questionnaireId, body, currentUser)
   })
 
   it('returns the current user history', async () => {
     const result = await controller.getHistory(currentUser, {})
 
-    expect(result).toEqual([diagnostic])
+    expect(result).toEqual(historyResponse)
     expect(service.getHistory).toHaveBeenCalledWith(currentUser, {})
   })
 
   it('returns a diagnostic detail', async () => {
-    const result = await controller.getDiagnosticById(1, currentUser)
+    const diagId = 'diag-uuid-1'
+    const result = await controller.getDiagnosticById(diagId, currentUser)
 
-    expect(result).toEqual(diagnostic)
-    expect(service.getDiagnosticById).toHaveBeenCalledWith(1, currentUser)
+    expect(result).toEqual(historyResponse.diagnostics[0])
+    expect(service.getDiagnosticById).toHaveBeenCalledWith(diagId, currentUser)
   })
 })

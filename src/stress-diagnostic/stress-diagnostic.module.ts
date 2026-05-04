@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
-import { Event } from '../questionnaires/entities/event.entity'
+import { Option } from '../questionnaires/entities/option.entity'
 import { Question } from '../questionnaires/entities/question.entity'
 import { Questionnaire } from '../questionnaires/entities/questionnaire.entity'
 import { StressDiagnosticController } from './controllers/stress-diagnostic.controller'
@@ -14,7 +14,7 @@ import { StressDiagnosticService } from './services/stress-diagnostic.service'
     TypeOrmModule.forFeature([
       Questionnaire,
       Question,
-      Event,
+      Option,
       StressDiagnosticResult,
       StressDiagnosticAnswer,
     ]),
