@@ -12,12 +12,12 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common'
+import { Roles } from '../auth/decorators/roles.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../auth/guards/roles.guard'
-import { Roles } from '../auth/decorators/roles.decorator'
 import { CreateInformationDto } from '../informations/dtos/create-information.dto'
-import { UpdateInformationDto } from '../informations/dtos/update-information.dto'
 import { InformationResponseDto } from '../informations/dtos/information-response.dto'
+import { UpdateInformationDto } from '../informations/dtos/update-information.dto'
 import { UtilisateurResponseDto } from '../utilisateurs/dtos/utilisateur-response.dto'
 import { AdminService } from './admin.service'
 
@@ -99,41 +99,13 @@ export class AdminController {
 
   // ========== GESTION DES QUESTIONNAIRES ==========
   @Get('questionnaires')
-  async getAllQuestionnaires(): Promise<any[]> {
+  async getAllQuestionnaires(): Promise<any> {
     return this.adminService.getAllQuestionnaires()
   }
 
   @Get('questionnaires/:id/questions')
-  async getQuestionnaireQuestions(@Param('id', ParseIntPipe) id: number): Promise<any[]> {
+  async getQuestionnaireQuestions(@Param('id') id: string): Promise<any[]> {
     return this.adminService.getQuestionnaireQuestions(id)
-  }
-
-  @Post('questionnaires/:questionnaireId/questions')
-  @HttpCode(HttpStatus.CREATED)
-  async addQuestion(
-    @Param('questionnaireId', ParseIntPipe) questionnaireId: number,
-    @Body('question') questionText: string,
-    @Body('order') order?: number,
-  ): Promise<any> {
-    return this.adminService.addQuestionToQuestionnaire(questionnaireId, questionText, order)
-  }
-
-  @Patch('questionnaires/events/:eventId/score')
-  async updateEventScore(
-    @Param('eventId', ParseIntPipe) eventId: number,
-    @Body('points') points: number,
-  ): Promise<any> {
-    return this.adminService.updateEventScore(eventId, points)
-  }
-
-  @Post('questionnaires/:questionnaireId/events')
-  @HttpCode(HttpStatus.CREATED)
-  async addEvent(
-    @Param('questionnaireId', ParseIntPipe) questionnaireId: number,
-    @Body('event') eventText: string,
-    @Body('points') points: number,
-  ): Promise<any> {
-    return this.adminService.addEventToQuestionnaire(questionnaireId, eventText, points)
   }
 
   // ========== STATISTIQUES GLOBALES ==========

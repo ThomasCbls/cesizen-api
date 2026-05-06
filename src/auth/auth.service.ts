@@ -52,12 +52,24 @@ export class AuthService {
   }
 
   async getProfile(user: AuthenticatedUser) {
+    const utilisateur = await this.utilisateurService.findByEmailWithPassword(user.email)
+
+    if (!utilisateur) {
+      return {
+        id: user.sub,
+        email: user.email,
+        nom: user.nom,
+        prenom: user.prenom,
+        role: user.role,
+      }
+    }
+
     return {
-      id: user.sub,
-      email: user.email,
-      nom: user.nom,
-      prenom: user.prenom,
-      role: user.role,
+      id: utilisateur.id_utilisateur,
+      email: utilisateur.email,
+      nom: utilisateur.nom,
+      prenom: utilisateur.prenom,
+      role: utilisateur.role,
     }
   }
 

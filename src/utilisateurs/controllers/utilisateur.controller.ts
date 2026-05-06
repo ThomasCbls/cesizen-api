@@ -10,9 +10,9 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common'
+import { Roles } from '../../auth/decorators/roles.decorator'
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../../auth/guards/roles.guard'
-import { Roles } from '../../auth/decorators/roles.decorator'
 import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto'
 import { PasswordValidationResponseDto } from '../dtos/password-validation-response.dto'
 import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto'

@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common'
 import { CreateInformationDto } from '../informations/dtos/create-information.dto'
-import { UpdateInformationDto } from '../informations/dtos/update-information.dto'
 import { InformationResponseDto } from '../informations/dtos/information-response.dto'
+import { UpdateInformationDto } from '../informations/dtos/update-information.dto'
 import { InformationService } from '../informations/services/information.service'
-import { UtilisateurResponseDto } from '../utilisateurs/dtos/utilisateur-response.dto'
-import { UtilisateurService } from '../utilisateurs/services/utilisateur.service'
 import { QuestionnaireService } from '../questionnaires/services/questionnaire.service'
+import { UtilisateurResponseDto } from '../utilisateurs/dtos/utilisateur-response.dto'
 import { UtilisateurRepository } from '../utilisateurs/repositories/utilisateur.repository'
+import { UtilisateurService } from '../utilisateurs/services/utilisateur.service'
 
 @Injectable()
 export class AdminService {
@@ -88,50 +88,26 @@ export class AdminService {
   }
 
   // ========== GESTION DES QUESTIONNAIRES ==========
-  async getAllQuestionnaires(): Promise<any[]> {
-    return this.questionnaireService.getAllQuestionnaires()
+  async getAllQuestionnaires(): Promise<any> {
+    return this.questionnaireService.getAllQuestionnaires({})
   }
 
-  async getQuestionnaireQuestions(questionnaireId: number): Promise<any[]> {
-    const questionnaire = await this.questionnaireService.getQuestionnaireById(questionnaireId)
-    return questionnaire.questions || []
-  }
-
-  async addQuestionToQuestionnaire(
-    questionnaireId: number,
-    questionText: string,
-    order?: number,
-  ): Promise<any> {
-    return this.questionnaireService.addQuestionToQuestionnaire(
-      questionnaireId,
-      questionText,
-      order,
-    )
-  }
-
-  async updateEventScore(eventId: number, newPoints: number): Promise<any> {
-    return this.questionnaireService.updateEventScore(eventId, newPoints)
-  }
-
-  async addEventToQuestionnaire(
-    questionnaireId: number,
-    eventText: string,
-    points: number,
-  ): Promise<any> {
-    return this.questionnaireService.addEventToQuestionnaire(questionnaireId, eventText, points)
+  async getQuestionnaireQuestions(questionnaireId: string): Promise<any[]> {
+    const result = await this.questionnaireService.getQuestionnaireById(questionnaireId)
+    return result.questionnaire.questions || []
   }
 
   // ========== STATISTIQUES GLOBALES ==========
   async getDashboardStats(): Promise<any> {
     const userStats = await this.getUserStats()
-    const questionnaires = await this.getAllQuestionnaires()
+    const { questionnaires, total } = await this.getAllQuestionnaires()
     const informations = await this.getAllInformations()
 
     return {
       users: userStats,
       questionnaires: {
-        total: questionnaires.length,
-        active: questionnaires.filter((q) => q.est_actif !== false).length,
+        total,
+        active: questionnaires.filter((q: any) => q.isActive !== false).length,
       },
       informations: {
         total: informations.length,
