@@ -1,7 +1,9 @@
-import { Test, TestingModule } from '@nestjs/testing'
 import { CanActivate, ExecutionContext, INestApplication, ValidationPipe } from '@nestjs/common'
+import { Test, TestingModule } from '@nestjs/testing'
 import request from 'supertest'
 import { App } from 'supertest/types'
+import { AppController } from '../src/app.controller'
+import { AppService } from '../src/app.service'
 import { AuthController } from '../src/auth/auth.controller'
 import { AuthService } from '../src/auth/auth.service'
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard'
@@ -22,14 +24,19 @@ class TestJwtAuthGuard implements CanActivate {
   }
 }
 
-describe('AppController (e2e)', () => {
+describe('Auth & StressDiagnostic (e2e)', () => {
   let app: INestApplication<App>
 
-  const authResponse = {
-    success: true,
-    accessToken: 'jwt-token',
-    tokenType: 'Bearer',
-    expiresIn: '1h',
+  const currentUser = {
+    sub: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
+    email: 'user@test.dev',
+    role: 'user',
+    nom: 'Stress',
+    prenom: 'Tester',
+  }
+
+  const authLoginResponse = {
+    access_token: 'jwt-token',
     user: {
       id: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
       email: 'user@test.dev',
@@ -39,47 +46,78 @@ describe('AppController (e2e)', () => {
     },
   }
 
-  const diagnosticResponse = {
-    id_diagnostic: 1,
-    questionnaire_id: 1,
-    questionnaire_nom: 'Diagnostic de stress CESIZen',
-    utilisateur_id: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
-    score_total: 6,
-    score_maximum: 12,
-    niveau_stress: 'modere',
-    interpretation: 'Niveau de stress modéré.',
-    date_soumission: '2026-03-31T10:00:00.000Z',
-    answers: [],
+  const profileResponse = {
+    id: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
+    email: 'user@test.dev',
+    nom: 'Stress',
+    prenom: 'Tester',
+    role: 'user',
+  }
+
+  const refreshResponse = {
+    access_token: 'new-jwt-token',
+    user: {
+      id: '08f6f8c2-2f35-43a9-96df-9cc6e7d38101',
+      email: 'user@test.dev',
+      nom: 'Stress',
+      prenom: 'Tester',
+      role: 'user',
+    },
+  }
+
+  const submitResponse = {
+    success: true,
+    diagnosticId: 'diag-uuid-1',
+    result: {
+      totalScore: 173,
+      maxScore: 600,
+      percentage: 28.8,
+      level: 'MODERATE',
+      interpretation: 'Niveau de stress modere.',
+      recommendations: ['Pratiquez des exercices de respiration'],
+    },
+    submittedAt: '2026-03-31T10:00:00.000Z',
+  }
+
+  const historyResponse = {
+    diagnostics: [
+      {
+        id: 'diag-uuid-1',
+        questionnaireId: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+        questionnaireTitle: 'Echelle de Holmes et Rahe',
+        result: submitResponse.result,
+        submittedAt: '2026-03-31T10:00:00.000Z',
+      },
+    ],
+    total: 1,
+    page: 1,
+    limit: 10,
   }
 
   const mockAuthService = {
-    login: jest.fn().mockResolvedValue(authResponse),
+    login: jest.fn().mockResolvedValue(authLoginResponse),
+    getProfile: jest.fn().mockResolvedValue(profileResponse),
+    refresh: jest.fn().mockResolvedValue(refreshResponse),
   }
 
   const mockStressDiagnosticService = {
-    submitDiagnostic: jest.fn().mockResolvedValue(diagnosticResponse),
-    getHistory: jest.fn().mockResolvedValue([diagnosticResponse]),
-    getDiagnosticById: jest.fn().mockResolvedValue(diagnosticResponse),
+    submitDiagnostic: jest.fn().mockResolvedValue(submitResponse),
+    getHistory: jest.fn().mockResolvedValue(historyResponse),
+    getDiagnosticById: jest.fn().mockResolvedValue(historyResponse.diagnostics[0]),
   }
 
   beforeEach(async () => {
-    const testingModuleBuilder = Test.createTestingModule({
-      controllers: [AuthController, StressDiagnosticController],
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      controllers: [AppController, AuthController, StressDiagnosticController],
       providers: [
-        {
-          provide: AuthService,
-          useValue: mockAuthService,
-        },
-        {
-          provide: StressDiagnosticService,
-          useValue: mockStressDiagnosticService,
-        },
+        AppService,
+        { provide: AuthService, useValue: mockAuthService },
+        { provide: StressDiagnosticService, useValue: mockStressDiagnosticService },
       ],
     })
       .overrideGuard(JwtAuthGuard)
       .useClass(TestJwtAuthGuard)
-
-    const moduleFixture: TestingModule = await testingModuleBuilder.compile()
+      .compile()
 
     app = moduleFixture.createNestApplication()
     app.useGlobalPipes(
@@ -87,38 +125,119 @@ describe('AppController (e2e)', () => {
         whitelist: true,
         forbidNonWhitelisted: true,
         transform: true,
-        transformOptions: {
-          enableImplicitConversion: true,
-        },
+        transformOptions: { enableImplicitConversion: true },
       }),
     )
     await app.init()
+
+    jest.clearAllMocks()
+    mockAuthService.login.mockResolvedValue(authLoginResponse)
+    mockAuthService.getProfile.mockResolvedValue(profileResponse)
+    mockAuthService.refresh.mockResolvedValue(refreshResponse)
+    mockStressDiagnosticService.submitDiagnostic.mockResolvedValue(submitResponse)
+    mockStressDiagnosticService.getHistory.mockResolvedValue(historyResponse)
+    mockStressDiagnosticService.getDiagnosticById.mockResolvedValue(historyResponse.diagnostics[0])
   })
 
   afterEach(async () => {
     await app.close()
   })
 
-  it('/auth/login (POST)', () => {
+  // ====== APP ======
+
+  it('GET / - returns Hello World', () => {
+    return request(app.getHttpServer()).get('/').expect(200).expect('Hello World!')
+  })
+
+  // ====== AUTH ======
+
+  it('POST /auth/login - returns access token on valid credentials', () => {
     return request(app.getHttpServer())
       .post('/auth/login')
       .send({ email: 'user@test.dev', password: 'Password123!' })
       .expect(200)
-      .expect(authResponse)
+      .expect(authLoginResponse)
   })
 
-  it('/stress-diagnostics/questionnaires/:id/submissions (POST) validates payload', () => {
+  it('POST /auth/login - returns 400 on missing fields', () => {
+    return request(app.getHttpServer()).post('/auth/login').send({}).expect(400)
+  })
+
+  it('GET /auth/profile - returns current user profile', () => {
     return request(app.getHttpServer())
-      .post('/stress-diagnostics/questionnaires/1/submissions')
+      .get('/auth/profile')
+      .set('Authorization', 'Bearer jwt-token')
+      .expect(200)
+      .expect((res) => {
+        expect(mockAuthService.getProfile).toHaveBeenCalledWith(
+          expect.objectContaining({ sub: currentUser.sub }),
+        )
+        expect(res.body).toEqual(profileResponse)
+      })
+  })
+
+  it('POST /auth/refresh - returns new access token', () => {
+    return request(app.getHttpServer())
+      .post('/auth/refresh')
+      .set('Authorization', 'Bearer jwt-token')
+      .expect(200)
+      .expect((res) => {
+        expect(mockAuthService.refresh).toHaveBeenCalledWith(
+          expect.objectContaining({ sub: currentUser.sub }),
+        )
+        expect(res.body).toEqual(refreshResponse)
+      })
+  })
+
+  it('POST /auth/logout - returns success', () => {
+    return request(app.getHttpServer())
+      .post('/auth/logout')
+      .set('Authorization', 'Bearer jwt-token')
+      .expect(200)
+      .expect({ success: true })
+  })
+
+  // ====== STRESS DIAGNOSTIC ======
+
+  it('POST /stress-diagnostics/questionnaires/:id/submissions - returns 400 on invalid payload', () => {
+    return request(app.getHttpServer())
+      .post('/stress-diagnostics/questionnaires/not-a-uuid/submissions')
       .send({ answers: [], unexpected: true })
       .expect(400)
   })
 
-  it('/stress-diagnostics/history (GET)', () => {
+  it('POST /stress-diagnostics/questionnaires/:id/submissions - submits successfully', () => {
+    // Use proper v4 UUIDs (version nibble = 4, variant nibble in {8,9,a,b})
+    const validQuestionnaireId = 'a1b2c3d4-e5f6-4890-abcd-ef1234567890'
+    return request(app.getHttpServer())
+      .post(`/stress-diagnostics/questionnaires/${validQuestionnaireId}/submissions`)
+      .set('Authorization', 'Bearer jwt-token')
+      .send({
+        answers: [
+          {
+            questionId: 'a1b2c3d4-e5f6-4890-abcd-ef1234567891',
+            optionId: 'a1b2c3d4-e5f6-4890-abcd-ef1234567892',
+          },
+        ],
+      })
+      .expect(201)
+      .expect(submitResponse)
+  })
+
+  it('GET /stress-diagnostics/history - returns history for current user', () => {
     return request(app.getHttpServer())
       .get('/stress-diagnostics/history')
       .set('Authorization', 'Bearer jwt-token')
       .expect(200)
-      .expect([diagnosticResponse])
+      .expect(historyResponse)
+  })
+
+  it('GET /stress-diagnostics/history/:diagnosticId - returns single diagnostic', () => {
+    const diagId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890'
+    return request(app.getHttpServer())
+      .get(`/stress-diagnostics/history/${diagId}`)
+      .set('Authorization', 'Bearer jwt-token')
+      .expect(200)
+      .expect(historyResponse.diagnostics[0])
   })
 })
