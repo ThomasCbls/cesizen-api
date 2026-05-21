@@ -1,9 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { UtilisateurController } from '../controllers/utilisateur.controller'
-import { UtilisateurService } from '../services/utilisateur.service'
 import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto'
 import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto'
 import { UtilisateurResponseDto } from '../dtos/utilisateur-response.dto'
+import { UtilisateurService } from '../services/utilisateur.service'
 
 describe('UtilisateurController', () => {
   let controller: UtilisateurController
@@ -15,9 +15,8 @@ describe('UtilisateurController', () => {
     prenom: 'Jean',
     email: 'jean.dupont@example.com',
     role: 'user',
+    est_actif: true,
     date_inscription: new Date(),
-    // date_modification: new Date(),
-    // est_actif: true,
   }
 
   beforeEach(async () => {

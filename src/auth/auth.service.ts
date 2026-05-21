@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { JwtService } from '@nestjs/jwt'
+import { ChangePasswordDto } from '../utilisateurs/dtos/change-password.dto'
 import { UtilisateurService } from '../utilisateurs/services/utilisateur.service'
 import { LoginDto } from './dtos/login.dto'
 import { AuthenticatedUser } from './interfaces/authenticated-user.interface'
@@ -71,6 +72,16 @@ export class AuthService {
       prenom: utilisateur.prenom,
       role: utilisateur.role,
     }
+  }
+
+  async changePassword(userId: string, changePasswordDto: ChangePasswordDto) {
+    await this.utilisateurService.changePassword(
+      userId,
+      changePasswordDto.oldPassword,
+      changePasswordDto.newPassword,
+    )
+
+    return { message: 'Mot de passe modifié avec succès' }
   }
 
   async refresh(user: AuthenticatedUser) {

@@ -39,4 +39,8 @@ export class StressDiagnosticRepository {
 
     return { diagnostics, total }
   }
+
+  async deleteByUtilisateurId(utilisateurId: string): Promise<void> {
+    await this.repository.delete({ utilisateur_id: utilisateurId })
+  }
 }

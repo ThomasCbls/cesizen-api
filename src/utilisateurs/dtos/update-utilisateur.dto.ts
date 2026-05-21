@@ -1,5 +1,10 @@
-import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsBoolean } from 'class-validator'
+import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength } from 'class-validator'
+import { IsValidPassword } from '../../auth/validators/is-valid-password.decorator'
 
+/**
+ * DTO pour la mise à jour d'un utilisateur
+ * Conforme aux recommandations ANSII pour la sécurité des mots de passe
+ */
 export class UpdateUtilisateurDto {
   @IsOptional()
   @IsString()
@@ -17,8 +22,8 @@ export class UpdateUtilisateurDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(8, { message: 'Le mot de passe doit contenir au moins 8 caractères' })
   @MaxLength(255)
+  @IsValidPassword()
   mot_de_passe?: string
 
   @IsOptional()

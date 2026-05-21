@@ -13,6 +13,7 @@ import {
 import { Roles } from '../../auth/decorators/roles.decorator'
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard'
 import { RolesGuard } from '../../auth/guards/roles.guard'
+import { ChangePasswordDto } from '../dtos/change-password.dto'
 import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto'
 import { PasswordValidationResponseDto } from '../dtos/password-validation-response.dto'
 import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto'
@@ -70,6 +71,20 @@ export class UtilisateurController {
       validatePasswordDto.password,
     )
     return { isValid }
+  }
+
+  @Post(':id/change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @Param('id') id: string,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ): Promise<UtilisateurResponseDto> {
+    return await this.utilisateurService.changePassword(
+      id,
+      changePasswordDto.oldPassword,
+      changePasswordDto.newPassword,
+    )
   }
 
   // Endpoints d'administration (réservés aux admins)

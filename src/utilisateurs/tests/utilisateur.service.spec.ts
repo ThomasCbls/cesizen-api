@@ -1,11 +1,11 @@
-import { Test, TestingModule } from '@nestjs/testing'
 import { BadRequestException, NotFoundException } from '@nestjs/common'
-import { UtilisateurService } from '../services/utilisateur.service'
-import { UtilisateurRepository } from '../repositories/utilisateur.repository'
+import { Test, TestingModule } from '@nestjs/testing'
+import * as bcrypt from 'bcrypt'
 import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto'
 import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto'
 import { Utilisateur } from '../entities/utilisateur.entity'
-import * as bcrypt from 'bcrypt'
+import { UtilisateurRepository } from '../repositories/utilisateur.repository'
+import { UtilisateurService } from '../services/utilisateur.service'
 
 jest.mock('bcrypt')
 
@@ -20,9 +20,8 @@ describe('UtilisateurService', () => {
     email: 'jean.dupont@example.com',
     mot_de_passe: 'hashedPassword123',
     role: 'user',
+    est_actif: true,
     date_inscription: new Date(),
-    // date_modification: new Date(),
-    // est_actif: true,
   }
 
   beforeEach(async () => {

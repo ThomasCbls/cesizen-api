@@ -1,14 +1,29 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common'
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common'
 import * as bcrypt from 'bcrypt'
+import { PasswordValidatorService } from '../../auth/validators/password-validator.service'
 import { CreateUtilisateurDto } from '../dtos/create-utilisateur.dto'
 import { UpdateUtilisateurDto } from '../dtos/update-utilisateur.dto'
 import { UtilisateurResponseDto } from '../dtos/utilisateur-response.dto'
 import { Utilisateur } from '../entities/utilisateur.entity'
+import { PasswordHistoryRepository } from '../repositories/password-history.repository'
 import { UtilisateurRepository } from '../repositories/utilisateur.repository'
 
+/**
+ * Service pour la gestion des utilisateurs
+ * Conforme aux recommandations ANSII pour la sécurité des mots de passe
+ */
 @Injectable()
 export class UtilisateurService {
-  constructor(private utilisateurRepository: UtilisateurRepository) {}
+  constructor(
+    private utilisateurRepository: UtilisateurRepository,
+    private passwordHistoryRepository: PasswordHistoryRepository,
+    private passwordValidator: PasswordValidatorService,
+  ) {}
 
   async create(createUtilisateurDto: CreateUtilisateurDto): Promise<UtilisateurResponseDto> {
     // Vérifier si l'email existe déjà
@@ -20,8 +35,16 @@ export class UtilisateurService {
       throw new BadRequestException('Cet email est déjà utilisé')
     }
 
-    // Hasher le mot de passe
-    const hashedPassword = await bcrypt.hash(createUtilisateurDto.mot_de_passe, 10)
+    // Valider le mot de passe selon les recommandations ANSII
+    const passwordValidation = this.passwordValidator.validatePassword(
+      createUtilisateurDto.mot_de_passe,
+    )
+    if (!passwordValidation.isValid) {
+      throw new BadRequestException(passwordValidation.errors.join(', '))
+    }
+
+    // Hasher le mot de passe (bcrypt avec salt rounds = 12 pour meilleure sécurité)
+    const hashedPassword = await bcrypt.hash(createUtilisateurDto.mot_de_passe, 12)
 
     // Créer le nouvel utilisateur
     const utilisateur = this.utilisateurRepository.create({
@@ -31,6 +54,13 @@ export class UtilisateurService {
     })
 
     const savedUtilisateur = await this.utilisateurRepository.save(utilisateur)
+
+    // Ajouter le mot de passe à l'historique
+    await this.passwordHistoryRepository.addPasswordToHistory(
+      savedUtilisateur.id_utilisateur,
+      hashedPassword,
+    )
+
     return this.mapToResponseDto(savedUtilisateur)
   }
 
@@ -94,6 +124,9 @@ export class UtilisateurService {
       throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
     }
 
+    // Supprimer l'historique des mots de passe
+    await this.passwordHistoryRepository.deleteUserHistory(id)
+
     await this.utilisateurRepository.remove(utilisateur)
   }
 
@@ -128,9 +161,39 @@ export class UtilisateurService {
       }
     }
 
-    // Si le mot de passe est fourni, le hasher
+    // Si le mot de passe est fourni, le hasher avec vérification ANSII
     if (updateUtilisateurDto.mot_de_passe) {
-      updateUtilisateurDto.mot_de_passe = await bcrypt.hash(updateUtilisateurDto.mot_de_passe, 10)
+      // Valider le mot de passe selon les recommandations ANSII
+      const passwordValidation = this.passwordValidator.validatePassword(
+        updateUtilisateurDto.mot_de_passe,
+      )
+      if (!passwordValidation.isValid) {
+        throw new BadRequestException(passwordValidation.errors.join(', '))
+      }
+
+      // Vérifier que le nouveau mot de passe n'a pas été utilisé récemment
+      const recentPasswords = await this.passwordHistoryRepository.getRecentPasswordHashes(id, 5)
+      for (const history of recentPasswords) {
+        const isReused = await bcrypt.compare(
+          updateUtilisateurDto.mot_de_passe,
+          history.mot_de_passe_hash,
+        )
+        if (isReused) {
+          throw new BadRequestException('Ce mot de passe a déjà été utilisé')
+        }
+      }
+
+      // Hasher le nouveau mot de passe
+      const newHashedPassword = await bcrypt.hash(updateUtilisateurDto.mot_de_passe, 12)
+      updateUtilisateurDto.mot_de_passe = newHashedPassword
+
+      // Ajouter le ancien mot de passe à l'historique avant de le remplacer
+      if (utilisateur.mot_de_passe) {
+        await this.passwordHistoryRepository.addPasswordToHistory(id, utilisateur.mot_de_passe)
+      }
+
+      // Nettoyer l'historique en gardant les 12 derniers mots de passe
+      await this.passwordHistoryRepository.cleanOldPasswords(id, 12)
     }
 
     Object.assign(utilisateur, updateUtilisateurDto)
@@ -179,5 +242,69 @@ export class UtilisateurService {
     // Ne pas renvoyer le mot de passe
     delete (dto as any).mot_de_passe
     return dto
+  }
+
+  /**
+   * Change le mot de passe d'un utilisateur de manière sécurisée
+   * Vérifie l'ancien mot de passe avant de permettre le changement
+   * Conforme aux recommandations ANSII
+   */
+  async changePassword(
+    id: string,
+    oldPassword: string,
+    newPassword: string,
+  ): Promise<UtilisateurResponseDto> {
+    const utilisateur = await this.utilisateurRepository.findById(id)
+
+    if (!utilisateur) {
+      throw new NotFoundException(`Utilisateur avec l'ID ${id} non trouvé`)
+    }
+
+    // Vérifier l'ancien mot de passe
+    const isOldPasswordValid = await this.validatePassword(oldPassword, utilisateur.mot_de_passe)
+    if (!isOldPasswordValid) {
+      throw new UnauthorizedException("L'ancien mot de passe est incorrect")
+    }
+
+    // Vérifier que le nouveau mot de passe est différent de l'ancien
+    if (oldPassword === newPassword) {
+      throw new BadRequestException('Le mot de passe doit être différent du précédent')
+    }
+
+    // Valider le nouveau mot de passe selon les recommandations ANSII
+    const passwordValidation = this.passwordValidator.validatePassword(newPassword)
+    if (!passwordValidation.isValid) {
+      throw new BadRequestException(passwordValidation.errors.join(', '))
+    }
+
+    // Vérifier que le nouveau mot de passe n'a pas été utilisé récemment
+    const recentPasswords = await this.passwordHistoryRepository.getRecentPasswordHashes(id, 5)
+    for (const history of recentPasswords) {
+      const isReused = await bcrypt.compare(newPassword, history.mot_de_passe_hash)
+      if (isReused) {
+        throw new BadRequestException('Ce mot de passe a déjà été utilisé')
+      }
+    }
+
+    // Ajouter l'ancien mot de passe à l'historique
+    await this.passwordHistoryRepository.addPasswordToHistory(id, utilisateur.mot_de_passe)
+
+    // Hasher et mettre à jour le nouveau mot de passe
+    const hashedPassword = await bcrypt.hash(newPassword, 12)
+    utilisateur.mot_de_passe = hashedPassword
+
+    const updatedUtilisateur = await this.utilisateurRepository.save(utilisateur)
+
+    // Nettoyer l'historique en gardant les 12 derniers mots de passe
+    await this.passwordHistoryRepository.cleanOldPasswords(id, 12)
+
+    return this.mapToResponseDto(updatedUtilisateur)
+  }
+
+  /**
+   * Génère un mot de passe robuste recommandé selon l'ANSII
+   */
+  generateStrongPassword(): string {
+    return this.passwordValidator.generateStrongPassword()
   }
 }

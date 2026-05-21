@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common'
@@ -18,6 +19,7 @@ import { RolesGuard } from '../auth/guards/roles.guard'
 import { CreateInformationDto } from '../informations/dtos/create-information.dto'
 import { InformationResponseDto } from '../informations/dtos/information-response.dto'
 import { UpdateInformationDto } from '../informations/dtos/update-information.dto'
+import { UpdateUtilisateurDto } from '../utilisateurs/dtos/update-utilisateur.dto'
 import { UtilisateurResponseDto } from '../utilisateurs/dtos/utilisateur-response.dto'
 import { AdminService } from './admin.service'
 
@@ -54,6 +56,14 @@ export class AdminController {
     @Body('role') role: string,
   ): Promise<UtilisateurResponseDto> {
     return this.adminService.changeUserRole(id, role)
+  }
+
+  @Put('utilisateurs/:id')
+  async updateUser(
+    @Param('id') id: string,
+    @Body() updateUtilisateurDto: UpdateUtilisateurDto,
+  ): Promise<UtilisateurResponseDto> {
+    return this.adminService.updateUser(id, updateUtilisateurDto)
   }
 
   @Delete('utilisateurs/:id')

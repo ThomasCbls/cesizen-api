@@ -4,6 +4,8 @@ import { InformationResponseDto } from '../informations/dtos/information-respons
 import { UpdateInformationDto } from '../informations/dtos/update-information.dto'
 import { InformationService } from '../informations/services/information.service'
 import { QuestionnaireService } from '../questionnaires/services/questionnaire.service'
+import { StressDiagnosticRepository } from '../stress-diagnostic/repositories/stress-diagnostic.repository'
+import { UpdateUtilisateurDto } from '../utilisateurs/dtos/update-utilisateur.dto'
 import { UtilisateurResponseDto } from '../utilisateurs/dtos/utilisateur-response.dto'
 import { UtilisateurRepository } from '../utilisateurs/repositories/utilisateur.repository'
 import { UtilisateurService } from '../utilisateurs/services/utilisateur.service'
@@ -15,6 +17,7 @@ export class AdminService {
     private readonly informationService: InformationService,
     private readonly questionnaireService: QuestionnaireService,
     private readonly utilisateurRepository: UtilisateurRepository,
+    private readonly stressDiagnosticRepository: StressDiagnosticRepository,
   ) {}
 
   // ========== GESTION DES UTILISATEURS ==========
@@ -57,7 +60,17 @@ export class AdminService {
     return this.utilisateurService.changeUserRole(id, role)
   }
 
+  async updateUser(
+    id: string,
+    updateUtilisateurDto: UpdateUtilisateurDto,
+  ): Promise<UtilisateurResponseDto> {
+    return this.utilisateurService.update(id, updateUtilisateurDto)
+  }
+
   async deleteUser(id: string): Promise<void> {
+    // Supprimer les diagnostics de stress avant de supprimer l'utilisateur
+    // (sécurité supplémentaire si les contraintes FK en base ne cascadent pas)
+    await this.stressDiagnosticRepository.deleteByUtilisateurId(id)
     return this.utilisateurService.hardDeleteUser(id)
   }
 
